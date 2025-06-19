@@ -20,6 +20,10 @@ app.use(express.json());
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/flashcard-app', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+}).then(() => {
+  console.log(`Database connected`)
+}).catch((error) => {
+  console.log()
 });
 
 const userSchema = new mongoose.Schema({
@@ -35,25 +39,24 @@ const userSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   if (!this.isModified('passwordHash')) return next();
   this.passwordHash = await bcrypt.hash(this.passwordHash, 12);
   next();
 });
 
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
 const User = mongoose.model('User', userSchema);
 
-const transporter = nodemailer.createTransporter({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: false,
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    user: process.env.EMAIL_USER,
+    // Use App Password instead of regular password
+    pass: process.env.EMAIL_APP_PASSWORD
   }
 });
 
@@ -66,14 +69,14 @@ const generateToken = (userId) => {
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     const user = await User.findById(decoded.userId).select('-passwordHash');
-    
+
     if (!user) {
       return res.status(401).json({ message: 'Token is not valid' });
     }
@@ -108,9 +111,9 @@ app.post('/register', [
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationToken = await crypto.randomBytes(32).toString('hex');
 
-    const user = new User({
+    const user = await new User({
       firstName,
       lastName,
       email,
@@ -121,7 +124,7 @@ app.post('/register', [
     await user.save();
 
     const verificationUrl = `http://localhost:5173/verify-email/${emailVerificationToken}`;
-    
+
     try {
       await transporter.sendMail({
         from: process.env.FROM_EMAIL || 'noreply@flashcardai.com',
@@ -364,7 +367,7 @@ app.put('/change-password', authMiddleware, [
 
     const user = await User.findById(req.user._id);
     const isMatch = await user.comparePassword(currentPassword);
-    
+
     if (!isMatch) {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }

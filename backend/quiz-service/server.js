@@ -26,10 +26,10 @@ const quizSchema = new mongoose.Schema({
   title: { type: String, required: true },
   sourceType: { type: String, enum: ['note', 'deck'], required: true },
   sourceId: { type: mongoose.Schema.Types.ObjectId, required: true },
-  quizType: { 
-    type: String, 
-    enum: ['multiple_choice', 'true_false', 'fill_blank', 'mixed'], 
-    default: 'multiple_choice' 
+  quizType: {
+    type: String,
+    enum: ['multiple_choice', 'true_false', 'fill_blank', 'mixed'],
+    default: 'multiple_choice'
   },
   questions: [{
     question: { type: String, required: true },
@@ -84,7 +84,7 @@ const Flashcard = mongoose.model('Flashcard', flashcardSchema);
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
@@ -147,7 +147,7 @@ const generateQuizWithAI = async (content, options) => {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     try {
       const questions = JSON.parse(text);
       return Array.isArray(questions) ? questions : [];
@@ -163,12 +163,12 @@ const generateQuizWithAI = async (content, options) => {
 
 app.post('/generate', authMiddleware, async (req, res) => {
   try {
-    const { 
-      source, 
-      sourceId, 
-      quizType = 'multiple_choice', 
-      numberOfQuestions = 10, 
-      timeLimit = 15 
+    const {
+      source,
+      sourceId,
+      quizType = 'multiple_choice',
+      numberOfQuestions = 10,
+      timeLimit = 15
     } = req.body;
 
     if (!source || !sourceId) {
@@ -190,7 +190,7 @@ app.post('/generate', authMiddleware, async (req, res) => {
       if (!deck) {
         return res.status(404).json({ message: 'Deck not found' });
       }
-      
+
       const flashcards = await Flashcard.find({ deckId: sourceId });
       content = flashcards.map(card => `Q: ${card.frontContent}\nA: ${card.backContent}`).join('\n\n');
       title = `Quiz: ${deck.name}`;
@@ -208,10 +208,10 @@ app.post('/generate', authMiddleware, async (req, res) => {
     if (aiQuestions.length === 0) {
       const fallbackQuestions = [{
         question: `What is the main topic covered in this ${source}?`,
-        options: quizType === 'multiple_choice' ? ['Topic A', 'Topic B', 'Topic C', 'Topic D'] : 
-                quizType === 'true_false' ? ['True', 'False'] : [],
-        correctAnswer: quizType === 'multiple_choice' ? 'Topic A' : 
-                      quizType === 'true_false' ? 'True' : 'Main topic',
+        options: quizType === 'multiple_choice' ? ['Topic A', 'Topic B', 'Topic C', 'Topic D'] :
+          quizType === 'true_false' ? ['True', 'False'] : [],
+        correctAnswer: quizType === 'multiple_choice' ? 'Topic A' :
+          quizType === 'true_false' ? 'True' : 'Main topic',
         explanation: 'This question tests basic understanding of the content.'
       }];
       aiQuestions.push(...fallbackQuestions);
@@ -254,11 +254,11 @@ app.get('/', authMiddleware, async (req, res) => {
 
 app.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const quiz = await Quiz.findOne({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const quiz = await Quiz.findOne({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
@@ -272,11 +272,11 @@ app.get('/:id', authMiddleware, async (req, res) => {
 
 app.post('/:id/start', authMiddleware, async (req, res) => {
   try {
-    const quiz = await Quiz.findOne({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const quiz = await Quiz.findOne({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
@@ -305,11 +305,11 @@ app.post('/:id/complete', authMiddleware, async (req, res) => {
   try {
     const { answers } = req.body;
 
-    const quiz = await Quiz.findOne({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const quiz = await Quiz.findOne({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
@@ -320,7 +320,7 @@ app.post('/:id/complete', authMiddleware, async (req, res) => {
     quiz.questions.forEach((question, index) => {
       const userAnswer = answers[index] || '';
       const isCorrect = userAnswer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim();
-      
+
       if (isCorrect) {
         correctAnswers++;
       }
@@ -364,9 +364,9 @@ app.post('/:id/complete', authMiddleware, async (req, res) => {
 
 app.get('/:id/results', authMiddleware, async (req, res) => {
   try {
-    const sessions = await QuizSession.find({ 
-      quizId: req.params.id, 
-      userId: req.userId 
+    const sessions = await QuizSession.find({
+      quizId: req.params.id,
+      userId: req.userId
     }).sort({ completedAt: -1 });
 
     if (sessions.length === 0) {
@@ -382,11 +382,11 @@ app.get('/:id/results', authMiddleware, async (req, res) => {
 
 app.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const quiz = await Quiz.findOneAndDelete({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const quiz = await Quiz.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }

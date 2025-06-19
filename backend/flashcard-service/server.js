@@ -57,7 +57,7 @@ const Note = mongoose.model('Note', noteSchema);
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
@@ -72,7 +72,7 @@ const authMiddleware = async (req, res, next) => {
 
 const generateFlashcardsWithAI = async (content, options) => {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const prompt = `
       Create ${options.numberOfCards} flashcards from the following content.
@@ -98,10 +98,14 @@ const generateFlashcardsWithAI = async (content, options) => {
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
-    
+    let text = response.text();
+
+    // Remove Markdown code block if present
+    text = text.replace(/```json|```/g, '').trim();
+
+    let flashcards;
     try {
-      const flashcards = JSON.parse(text);
+      flashcards = JSON.parse(text);
       return Array.isArray(flashcards) ? flashcards : [];
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
@@ -126,9 +130,9 @@ app.post('/generate', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Note not found' });
     }
 
-    let deck = await FlashcardDeck.findOne({ 
-      userId: req.userId, 
-      name: `${note.title} - Flashcards` 
+    let deck = await FlashcardDeck.findOne({
+      userId: req.userId,
+      name: `${note.title} - Flashcards`
     });
 
     if (!deck) {
@@ -204,7 +208,7 @@ app.get('/decks', authMiddleware, async (req, res) => {
 app.get('/', authMiddleware, async (req, res) => {
   try {
     const { deckId } = req.query;
-    
+
     const query = { userId: req.userId };
     if (deckId) {
       query.deckId = deckId;
@@ -223,11 +227,11 @@ app.get('/', authMiddleware, async (req, res) => {
 
 app.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const flashcard = await Flashcard.findOne({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const flashcard = await Flashcard.findOne({
+      _id: req.params.id,
+      userId: req.userId
     }).populate('deckId', 'name');
-    
+
     if (!flashcard) {
       return res.status(404).json({ message: 'Flashcard not found' });
     }
@@ -265,11 +269,11 @@ app.put('/:id', authMiddleware, async (req, res) => {
 
 app.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const flashcard = await Flashcard.findOneAndDelete({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const flashcard = await Flashcard.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!flashcard) {
       return res.status(404).json({ message: 'Flashcard not found' });
     }
@@ -293,11 +297,11 @@ app.post('/:id/review', authMiddleware, async (req, res) => {
   try {
     const { isCorrect } = req.body;
 
-    const flashcard = await Flashcard.findOne({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const flashcard = await Flashcard.findOne({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!flashcard) {
       return res.status(404).json({ message: 'Flashcard not found' });
     }
@@ -310,7 +314,7 @@ app.post('/:id/review', authMiddleware, async (req, res) => {
 
     const accuracy = flashcard.correctCount / flashcard.reviewCount;
     let nextReviewDays = 1;
-    
+
     if (accuracy >= 0.8) {
       nextReviewDays = Math.min(flashcard.reviewCount * 2, 30);
     } else if (accuracy >= 0.6) {
@@ -359,11 +363,11 @@ app.post('/deck', authMiddleware, async (req, res) => {
 
 app.delete('/deck/:id', authMiddleware, async (req, res) => {
   try {
-    const deck = await FlashcardDeck.findOneAndDelete({ 
-      _id: req.params.id, 
-      userId: req.userId 
+    const deck = await FlashcardDeck.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId
     });
-    
+
     if (!deck) {
       return res.status(404).json({ message: 'Deck not found' });
     }

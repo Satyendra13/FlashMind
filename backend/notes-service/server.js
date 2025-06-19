@@ -47,7 +47,7 @@ const Note = mongoose.model('Note', noteSchema);
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
@@ -76,7 +76,7 @@ const upload = multer({
       'image/png',
       'image/gif'
     ];
-    
+
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -91,20 +91,20 @@ const extractTextFromFile = async (buffer, mimetype, filename) => {
       case 'application/pdf':
         const pdfData = await pdfParse(buffer);
         return pdfData.text;
-      
+
       case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         const docxResult = await mammoth.extractRawText({ buffer });
         return docxResult.value;
-      
+
       case 'text/plain':
         return buffer.toString('utf-8');
-      
+
       case 'image/jpeg':
       case 'image/png':
       case 'image/gif':
         const ocrResult = await Tesseract.recognize(buffer, 'eng');
         return ocrResult.data.text;
-      
+
       default:
         throw new Error('Unsupported file type');
     }
@@ -207,13 +207,13 @@ app.post('/manual', authMiddleware, async (req, res) => {
 app.get('/', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 20, search, folder } = req.query;
-    
+
     const query = { userId: req.userId };
-    
+
     if (search) {
       query.$text = { $search: search };
     }
-    
+
     if (folder && folder !== 'all') {
       query.folder = folder;
     }
@@ -240,7 +240,7 @@ app.get('/', authMiddleware, async (req, res) => {
 app.get('/:id', authMiddleware, async (req, res) => {
   try {
     const note = await Note.findOne({ _id: req.params.id, userId: req.userId });
-    
+
     if (!note) {
       return res.status(404).json({ message: 'Note not found' });
     }
@@ -279,7 +279,7 @@ app.put('/:id', authMiddleware, async (req, res) => {
 app.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const note = await Note.findOne({ _id: req.params.id, userId: req.userId });
-    
+
     if (!note) {
       return res.status(404).json({ message: 'Note not found' });
     }

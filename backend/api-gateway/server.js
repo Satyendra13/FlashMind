@@ -1,8 +1,9 @@
+require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { createProxyMiddleware } = require('http-proxy-middleware');
+const proxy = require('express-http-proxy');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,44 +23,24 @@ const limiter = rateLimit({
 app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 
-const authProxy = createProxyMiddleware({
-  target: 'http://localhost:3001',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/auth': ''
-  }
+const authProxy = proxy('http://localhost:3001', {
+  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/auth/, '') || '/'
 });
 
-const notesProxy = createProxyMiddleware({
-  target: 'http://localhost:3002',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/notes': ''
-  }
+const notesProxy = proxy('http://localhost:3002', {
+  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/notes/, '') || '/'
 });
 
-const flashcardsProxy = createProxyMiddleware({
-  target: 'http://localhost:3003',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/flashcards': ''
-  }
+const flashcardsProxy = proxy('http://localhost:3003', {
+  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/flashcards/, '') || '/'
 });
 
-const quizProxy = createProxyMiddleware({
-  target: 'http://localhost:3004',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/quiz': ''
-  }
+const quizProxy = proxy('http://localhost:3004', {
+  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/quizzes/, '') || '/'
 });
 
-const dashboardProxy = createProxyMiddleware({
-  target: 'http://localhost:3001',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/dashboard': '/dashboard'
-  }
+const dashboardProxy = proxy('http://localhost:3001', {
+  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/dashboard/, '/dashboard') || '/dashboard'
 });
 
 app.use('/api/auth', authProxy);

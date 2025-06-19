@@ -36,9 +36,21 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       const [statsRes, activityRes, performanceRes] = await Promise.all([
-        axios.get('/dashboard/stats'),
-        axios.get('/dashboard/recent-activity'),
-        axios.get('/dashboard/performance')
+        axios.get('/dashboard/stats', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+        }),
+        axios.get('/dashboard/recent-activity', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+        }),
+        axios.get('/dashboard/performance', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+        })
       ]);
 
       setStats(statsRes.data);
