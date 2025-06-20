@@ -31,6 +31,10 @@ const quizSchema = new mongoose.Schema({
     enum: ['multiple_choice', 'true_false', 'fill_blank', 'mixed'],
     default: 'multiple_choice'
   },
+  totalQuestions: {
+    type: Number,
+    default: 0,
+  },
   questions: [{
     question: { type: String, required: true },
     options: [String],
@@ -99,7 +103,7 @@ const authMiddleware = async (req, res, next) => {
 
 const generateQuizWithAI = async (content, options) => {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     let prompt = `
       Create ${options.numberOfQuestions} quiz questions from the following content.
@@ -146,7 +150,10 @@ const generateQuizWithAI = async (content, options) => {
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
+    let text = response.text();
+
+    // Remove Markdown code block if present
+    text = text.replace(/```json|```/g, '').trim();
 
     try {
       const questions = JSON.parse(text);
@@ -223,6 +230,7 @@ app.post('/generate', authMiddleware, async (req, res) => {
       sourceType: source,
       sourceId,
       quizType,
+      totalQuestions: aiQuestions.length,
       questions: aiQuestions,
       timeLimit
     });
@@ -303,7 +311,11 @@ app.post('/:id/start', authMiddleware, async (req, res) => {
 
 app.post('/:id/complete', authMiddleware, async (req, res) => {
   try {
-    const { answers } = req.body;
+    const { answers, sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ message: 'Session ID is required' });
+    }
 
     const quiz = await Quiz.findOne({
       _id: req.params.id,
@@ -312,6 +324,16 @@ app.post('/:id/complete', authMiddleware, async (req, res) => {
 
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    const session = await QuizSession.findOne({
+      _id: sessionId,
+      quizId: quiz._id,
+      userId: req.userId
+    });
+
+    if (!session) {
+      return res.status(404).json({ message: 'Quiz session not found' });
     }
 
     let correctAnswers = 0;
@@ -335,17 +357,12 @@ app.post('/:id/complete', authMiddleware, async (req, res) => {
 
     const score = Math.round((correctAnswers / quiz.questions.length) * 100);
 
-    const session = new QuizSession({
-      userId: req.userId,
-      quizId: quiz._id,
-      answers: processedAnswers,
-      score,
-      totalQuestions: quiz.questions.length,
-      correctAnswers,
-      timeTaken: quiz.timeLimit * 60,
-      completedAt: new Date()
-    });
-
+    session.answers = processedAnswers;
+    session.score = score;
+    session.totalQuestions = quiz.questions.length;
+    session.correctAnswers = correctAnswers;
+    session.timeTaken = quiz.timeLimit * 60;
+    session.completedAt = new Date();
     await session.save();
 
     res.json({

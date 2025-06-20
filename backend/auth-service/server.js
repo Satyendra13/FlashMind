@@ -127,11 +127,11 @@ app.post('/register', [
 
     try {
       await transporter.sendMail({
-        from: process.env.FROM_EMAIL || 'noreply@flashcardai.com',
+        from: process.env.FROM_EMAIL || 'noreply@flashmind.com',
         to: email,
-        subject: 'Verify Your Email - FlashCard AI',
+        subject: 'Verify Your Email - FlashMind',
         html: `
-          <h2>Welcome to FlashCard AI!</h2>
+          <h2>Welcome to FlashMind!</h2>
           <p>Please click the link below to verify your email address:</p>
           <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
           <p>If you didn't create an account, please ignore this email.</p>
@@ -248,9 +248,9 @@ app.post('/forgot-password', [
 
     try {
       await transporter.sendMail({
-        from: process.env.FROM_EMAIL || 'noreply@flashcardai.com',
+        from: process.env.FROM_EMAIL || 'noreply@flashmind.com',
         to: email,
-        subject: 'Password Reset - FlashCard AI',
+        subject: 'Password Reset - FlashMind',
         html: `
           <h2>Password Reset Request</h2>
           <p>You requested a password reset. Click the link below to reset your password:</p>

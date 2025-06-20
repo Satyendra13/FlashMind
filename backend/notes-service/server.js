@@ -21,6 +21,10 @@ app.use(express.json());
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/flashcard-app', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+}).then(() => {
+  console.log('Notes service connected to MongoDB');
+}).catch((error) => {
+  console.error('MongoDB connection error:', error);
 });
 
 let bucket;
@@ -56,6 +60,7 @@ const authMiddleware = async (req, res, next) => {
     req.userId = decoded.userId;
     next();
   } catch (error) {
+    console.error('Auth middleware error:', error);
     res.status(401).json({ message: 'Token is not valid' });
   }
 };
@@ -64,7 +69,7 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024
+    fileSize: 10 * 1024 * 1024 // 10MB
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
@@ -102,8 +107,13 @@ const extractTextFromFile = async (buffer, mimetype, filename) => {
       case 'image/jpeg':
       case 'image/png':
       case 'image/gif':
-        const ocrResult = await Tesseract.recognize(buffer, 'eng');
-        return ocrResult.data.text;
+        try {
+          const ocrResult = await Tesseract.recognize(buffer, 'eng');
+          return ocrResult.data.text;
+        } catch (ocrError) {
+          console.error('OCR error:', ocrError);
+          return 'Could not extract text from image';
+        }
 
       default:
         throw new Error('Unsupported file type');
@@ -114,6 +124,7 @@ const extractTextFromFile = async (buffer, mimetype, filename) => {
   }
 };
 
+// Upload file endpoint
 app.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -122,6 +133,7 @@ app.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
 
     const { folder = 'General' } = req.body;
 
+    // Store file in GridFS
     const uploadStream = bucket.openUploadStream(req.file.originalname, {
       metadata: {
         userId: req.userId,
@@ -135,12 +147,14 @@ app.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
 
     uploadStream.on('finish', async () => {
       try {
+        // Extract text from file
         const extractedText = await extractTextFromFile(
           req.file.buffer,
           req.file.mimetype,
           req.file.originalname
         );
 
+        // Create note with extracted text
         const note = new Note({
           userId: req.userId,
           title: req.file.originalname.replace(/\.[^/.]+$/, ''),
@@ -176,6 +190,7 @@ app.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
   }
 });
 
+// Create manual note
 app.post('/manual', authMiddleware, async (req, res) => {
   try {
     const { title, content, folder = 'General', tags = [] } = req.body;
@@ -186,8 +201,8 @@ app.post('/manual', authMiddleware, async (req, res) => {
 
     const note = new Note({
       userId: req.userId,
-      title,
-      content,
+      title: title.trim(),
+      content: content.trim(),
       folder,
       tags
     });
@@ -204,6 +219,7 @@ app.post('/manual', authMiddleware, async (req, res) => {
   }
 });
 
+// Get all notes
 app.get('/', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 20, search, folder } = req.query;
@@ -211,7 +227,11 @@ app.get('/', authMiddleware, async (req, res) => {
     const query = { userId: req.userId };
 
     if (search) {
-      query.$text = { $search: search };
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { content: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } }
+      ];
     }
 
     if (folder && folder !== 'all') {
@@ -228,7 +248,7 @@ app.get('/', authMiddleware, async (req, res) => {
     res.json({
       notes,
       totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       total
     });
   } catch (error) {
@@ -237,6 +257,7 @@ app.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+// Get single note
 app.get('/:id', authMiddleware, async (req, res) => {
   try {
     const note = await Note.findOne({ _id: req.params.id, userId: req.userId });
@@ -252,13 +273,23 @@ app.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Update note
 app.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { title, content, folder, tags } = req.body;
 
+    if (!title || !content) {
+      return res.status(400).json({ message: 'Title and content are required' });
+    }
+
     const note = await Note.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
-      { title, content, folder, tags },
+      {
+        title: title.trim(),
+        content: content.trim(),
+        folder,
+        tags: tags || []
+      },
       { new: true }
     );
 
@@ -276,6 +307,7 @@ app.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Delete note
 app.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const note = await Note.findOne({ _id: req.params.id, userId: req.userId });
@@ -284,6 +316,7 @@ app.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Note not found' });
     }
 
+    // Delete associated file if exists
     if (note.fileId) {
       try {
         await bucket.delete(note.fileId);
@@ -301,6 +334,7 @@ app.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Download file
 app.get('/file/:fileId', authMiddleware, async (req, res) => {
   try {
     const downloadStream = bucket.openDownloadStream(
@@ -317,6 +351,11 @@ app.get('/file/:fileId', authMiddleware, async (req, res) => {
     console.error('File download handler error:', error);
     res.status(500).json({ message: 'Server error downloading file' });
   }
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', service: 'notes-service' });
 });
 
 app.listen(PORT, () => {

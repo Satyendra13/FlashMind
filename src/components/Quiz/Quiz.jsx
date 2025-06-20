@@ -9,6 +9,7 @@ import {
 	Modal,
 	ProgressBar,
 	Alert,
+	Badge,
 } from "react-bootstrap";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -21,21 +22,29 @@ import {
 	Target,
 	BarChart3,
 	RefreshCw,
+	Plus,
+	Trash2,
+	Eye,
+	Calendar,
+	TrendingUp,
 } from "lucide-react";
 
 const Quiz = () => {
 	const [quizzes, setQuizzes] = useState([]);
 	const [notes, setNotes] = useState([]);
 	const [decks, setDecks] = useState([]);
+	const [quizHistory, setQuizHistory] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [showGenerateModal, setShowGenerateModal] = useState(false);
 	const [showQuizModal, setShowQuizModal] = useState(false);
 	const [showResultsModal, setShowResultsModal] = useState(false);
+	const [showHistoryModal, setShowHistoryModal] = useState(false);
 	const [currentQuiz, setCurrentQuiz] = useState(null);
 	const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 	const [userAnswers, setUserAnswers] = useState([]);
 	const [timeLeft, setTimeLeft] = useState(0);
 	const [quizResults, setQuizResults] = useState(null);
+	const [quizStartTime, setQuizStartTime] = useState(null);
 	const [generateOptions, setGenerateOptions] = useState({
 		source: "note",
 		sourceId: "",
@@ -66,7 +75,7 @@ const Quiz = () => {
 
 	const fetchData = async () => {
 		try {
-			const [quizzesRes, notesRes, decksRes] = await Promise.all([
+			const [quizzesRes, notesRes, decksRes, historyRes] = await Promise.all([
 				axios.get("/quizzes", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -82,12 +91,21 @@ const Quiz = () => {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
+				axios
+					.get("/quizzes/sessions/history", {
+						headers: {
+							Authorization: `Bearer ${localStorage.getItem("token")}`,
+						},
+					})
+					.catch(() => ({ data: [] })), // Handle if endpoint doesn't exist
 			]);
 
 			setQuizzes(quizzesRes.data);
-			setNotes(notesRes.data.notes);
+			setNotes(notesRes.data.notes || []);
 			setDecks(decksRes.data);
+			setQuizHistory(historyRes.data || []);
 		} catch (error) {
+			console.error("Error fetching data:", error);
 			toast.error("Failed to fetch data");
 		} finally {
 			setLoading(false);
@@ -96,11 +114,17 @@ const Quiz = () => {
 
 	const generateQuiz = async () => {
 		try {
+			if (!generateOptions.sourceId) {
+				toast.error("Please select a source");
+				return;
+			}
+
 			const response = await axios.post("/quizzes/generate", generateOptions, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
 			});
+
 			toast.success("Quiz generated successfully!");
 			fetchData();
 			setShowGenerateModal(false);
@@ -112,16 +136,34 @@ const Quiz = () => {
 				timeLimit: 15,
 			});
 		} catch (error) {
+			console.error("Generate quiz error:", error);
 			toast.error("Failed to generate quiz");
 		}
 	};
 
-	const startQuiz = (quiz) => {
-		setCurrentQuiz(quiz);
-		setCurrentQuestionIndex(0);
-		setUserAnswers(new Array(quiz.questions?.length).fill(""));
-		setTimeLeft(quiz.timeLimit * 60);
-		setShowQuizModal(true);
+	const startQuiz = async (quiz) => {
+		try {
+			// Start quiz session
+			const response = await axios.post(
+				`/quizzes/${quiz._id}/start`,
+				{},
+				{
+					headers: {
+						Authorization: `Bearer ${localStorage.getItem("token")}`,
+					},
+				}
+			);
+
+			setCurrentQuiz(response.data);
+			setCurrentQuestionIndex(0);
+			setUserAnswers(new Array(quiz.questions?.length || 0).fill(""));
+			setTimeLeft(quiz.timeLimit * 60);
+			setQuizStartTime(new Date());
+			setShowQuizModal(true);
+		} catch (error) {
+			console.error("Start quiz error:", error);
+			toast.error("Failed to start quiz");
+		}
 	};
 
 	const handleAnswerSelect = (answer) => {
@@ -131,7 +173,10 @@ const Quiz = () => {
 	};
 
 	const handleNextQuestion = () => {
-		if (currentQuestionIndex < currentQuiz.questions?.length - 1) {
+		if (
+			currentQuestionIndex <
+			(currentQuiz?.quiz?.questions?.length || 0) - 1
+		) {
 			setCurrentQuestionIndex(currentQuestionIndex + 1);
 		} else {
 			handleSubmitQuiz();
@@ -147,8 +192,9 @@ const Quiz = () => {
 	const handleSubmitQuiz = async () => {
 		try {
 			const response = await axios.post(
-				`/quizzes/${currentQuiz._id}/complete`,
+				`/quizzes/${currentQuiz?.quiz?._id}/complete`,
 				{
+					sessionId: currentQuiz.sessionId,
 					answers: userAnswers,
 				},
 				{
@@ -163,7 +209,26 @@ const Quiz = () => {
 			setShowResultsModal(true);
 			fetchData();
 		} catch (error) {
+			console.error("Submit quiz error:", error);
 			toast.error("Failed to submit quiz");
+		}
+	};
+
+	const deleteQuiz = async (quizId) => {
+		if (window.confirm("Are you sure you want to delete this quiz?")) {
+			try {
+				await axios.delete(`/quizzes/${quizId}`, {
+					headers: {
+						Authorization: `Bearer ${localStorage.getItem("token")}`,
+					},
+				});
+
+				toast.success("Quiz deleted successfully!");
+				fetchData();
+			} catch (error) {
+				console.error("Delete quiz error:", error);
+				toast.error("Failed to delete quiz");
+			}
 		}
 	};
 
@@ -178,9 +243,7 @@ const Quiz = () => {
 			<Card.Body>
 				<div className="d-flex justify-content-between align-items-start mb-3">
 					<h5 className="fw-bold mb-0">{quiz.title}</h5>
-					<span className="badge bg-secondary">
-						{quiz?.questions?.length} questions
-					</span>
+					<Badge bg="secondary">{quiz?.totalQuestions || 0} questions</Badge>
 				</div>
 
 				<div className="d-flex align-items-center mb-2">
@@ -197,12 +260,26 @@ const Quiz = () => {
 
 				<div className="d-flex justify-content-between align-items-center">
 					<small className="text-muted">
-						Created {new Date(quiz.createdAt).toLocaleDateString()}
+						<Calendar size={12} className="me-1" />
+						{new Date(quiz.createdAt).toLocaleDateString()}
 					</small>
-					<Button variant="primary" size="sm" onClick={() => startQuiz(quiz)}>
-						<Play size={12} className="me-1" />
-						Start Quiz
-					</Button>
+					<div className="btn-group">
+						<Button variant="primary" size="sm" onClick={() => startQuiz(quiz)}>
+							<div className="d-flex justify-content-between align-items-center">
+								<div className="d-flex justify-content-between align-items-center">
+									<Play size={12} className="me-1" />
+									<span>Start</span>
+								</div>
+							</div>
+						</Button>
+						<Button
+							variant="outline-danger"
+							size="sm"
+							onClick={() => deleteQuiz(quiz._id)}
+						>
+							<Trash2 size={12} />
+						</Button>
+					</div>
 				</div>
 			</Card.Body>
 		</Card>
@@ -218,16 +295,16 @@ const Quiz = () => {
 			<Card.Body>
 				<div className="d-flex justify-content-between align-items-center mb-3">
 					<h6 className="text-muted mb-0">Question {questionIndex + 1}</h6>
-					<span className="badge bg-primary">
-						{currentQuiz.quizType.replace("_", " ")}
-					</span>
+					<Badge bg="primary">
+						{currentQuiz?.quiz?.quizType.replace("_", " ")}
+					</Badge>
 				</div>
 
 				<h5 className="mb-4">{question.question}</h5>
 
-				{currentQuiz.quizType === "multiple_choice" && (
+				{currentQuiz?.quiz?.quizType === "multiple_choice" && (
 					<div>
-						{question.options.map((option, index) => (
+						{question.options?.map((option, index) => (
 							<Form.Check
 								key={index}
 								type="radio"
@@ -238,19 +315,19 @@ const Quiz = () => {
 								onChange={() => onAnswerSelect(option)}
 								className="mb-2"
 							/>
-						))}
+						)) || <p className="text-muted">No options available</p>}
 					</div>
 				)}
 
-				{currentQuiz.quizType === "true_false" && (
+				{currentQuiz?.quiz?.quizType === "true_false" && (
 					<div>
 						<Form.Check
 							type="radio"
 							name={`question-${questionIndex}`}
 							id={`question-${questionIndex}-true`}
 							label="True"
-							checked={selectedAnswer === "true"}
-							onChange={() => onAnswerSelect("true")}
+							checked={selectedAnswer === "True"}
+							onChange={() => onAnswerSelect("True")}
 							className="mb-2"
 						/>
 						<Form.Check
@@ -258,14 +335,14 @@ const Quiz = () => {
 							name={`question-${questionIndex}`}
 							id={`question-${questionIndex}-false`}
 							label="False"
-							checked={selectedAnswer === "false"}
-							onChange={() => onAnswerSelect("false")}
+							checked={selectedAnswer === "False"}
+							onChange={() => onAnswerSelect("False")}
 							className="mb-2"
 						/>
 					</div>
 				)}
 
-				{currentQuiz.quizType === "fill_blank" && (
+				{currentQuiz?.quiz?.quizType === "fill_blank" && (
 					<Form.Control
 						type="text"
 						value={selectedAnswer}
@@ -287,7 +364,37 @@ const Quiz = () => {
 		);
 	}
 
-	const currentQuestion = currentQuiz?.questions?.[currentQuestionIndex];
+	const currentQuestion = currentQuiz?.quiz?.questions?.[currentQuestionIndex];
+
+	// Calculate statistics
+	const totalQuizzes = new Set(
+		quizHistory.map((session) => session.quizId._id.toString())
+	).size;
+
+	// Completed quizzes = sessions where completedAt exists
+	const completedQuizzesList = quizHistory.filter(
+		(session) => session.completedAt
+	);
+
+	// Count of completed quizzes
+	const completedQuizzes = completedQuizzesList.length;
+
+	// Average score
+	const averageScore =
+		completedQuizzes > 0
+			? Math.round(
+					completedQuizzesList.reduce(
+						(acc, session) => acc + session.score,
+						0
+					) / completedQuizzes
+			  )
+			: 0;
+
+	// Best score
+	const bestScore =
+		completedQuizzes > 0
+			? Math.max(...completedQuizzesList.map((session) => session.score))
+			: 0;
 
 	return (
 		<Container fluid className="py-4">
@@ -299,9 +406,21 @@ const Quiz = () => {
 					</p>
 				</Col>
 				<Col md={4} className="text-md-end">
+					<Button
+						variant="outline-primary"
+						className="me-2"
+						onClick={() => setShowHistoryModal(true)}
+					>
+						<div className="d-flex justify-content-between align-items-center">
+							<Eye size={16} className="me-2" />
+							<span>History</span>
+						</div>
+					</Button>
 					<Button variant="primary" onClick={() => setShowGenerateModal(true)}>
-						<Play size={16} className="me-2" />
-						Generate Quiz
+						<div className="d-flex justify-content-between align-items-center">
+							<Play size={16} className="me-2" />
+							<span>Generate Quiz</span>
+						</div>
 					</Button>
 				</Col>
 			</Row>
@@ -313,7 +432,7 @@ const Quiz = () => {
 							<div className="rounded-circle bg-primary bg-opacity-10 p-3 mx-auto mb-3 d-inline-flex">
 								<BarChart3 className="text-primary" size={24} />
 							</div>
-							<h3 className="fw-bold">{quizzes.length}</h3>
+							<h3 className="fw-bold">{totalQuizzes}</h3>
 							<p className="text-muted mb-0">Total Quizzes</p>
 						</Card.Body>
 					</Card>
@@ -324,7 +443,7 @@ const Quiz = () => {
 							<div className="rounded-circle bg-success bg-opacity-10 p-3 mx-auto mb-3 d-inline-flex">
 								<CheckCircle className="text-success" size={24} />
 							</div>
-							<h3 className="fw-bold">15</h3>
+							<h3 className="fw-bold">{completedQuizzes}</h3>
 							<p className="text-muted mb-0">Completed</p>
 						</Card.Body>
 					</Card>
@@ -335,7 +454,7 @@ const Quiz = () => {
 							<div className="rounded-circle bg-warning bg-opacity-10 p-3 mx-auto mb-3 d-inline-flex">
 								<Award className="text-warning" size={24} />
 							</div>
-							<h3 className="fw-bold">87%</h3>
+							<h3 className="fw-bold">{averageScore}%</h3>
 							<p className="text-muted mb-0">Average Score</p>
 						</Card.Body>
 					</Card>
@@ -346,7 +465,7 @@ const Quiz = () => {
 							<div className="rounded-circle bg-info bg-opacity-10 p-3 mx-auto mb-3 d-inline-flex">
 								<Target className="text-info" size={24} />
 							</div>
-							<h3 className="fw-bold">98%</h3>
+							<h3 className="fw-bold">{bestScore}%</h3>
 							<p className="text-muted mb-0">Best Score</p>
 						</Card.Body>
 					</Card>
@@ -375,12 +494,15 @@ const Quiz = () => {
 						Generate your first quiz from your notes or flashcard decks.
 					</p>
 					<Button variant="primary" onClick={() => setShowGenerateModal(true)}>
-						<Play size={16} className="me-2" />
-						Generate Your First Quiz
+						<div className="d-flex justify-content-between align-items-center">
+							<Play size={16} className="me-2" />
+							<span>Generate Your First Quiz</span>
+						</div>
 					</Button>
 				</div>
 			)}
 
+			{/* Generate Quiz Modal */}
 			<Modal
 				show={showGenerateModal}
 				onHide={() => setShowGenerateModal(false)}
@@ -500,22 +622,23 @@ const Quiz = () => {
 						onClick={generateQuiz}
 						disabled={!generateOptions.sourceId}
 					>
-						<Play size={16} className="me-2" />
-						Generate Quiz
+						<div className="d-flex justify-content-between align-items-center">
+							<Play size={16} className="me-2" />
+							<span>Generate Quiz</span>
+						</div>
 					</Button>
 				</Modal.Footer>
 			</Modal>
 
+			{/* Quiz Taking Modal */}
 			<Modal show={showQuizModal} onHide={() => {}} size="lg" backdrop="static">
 				<Modal.Header>
 					<Modal.Title className="d-flex align-items-center">
-						<span className="me-3">{currentQuiz?.title}</span>
-						<span
-							className={`badge ${timeLeft < 60 ? "bg-danger" : "bg-primary"}`}
-						>
+						<span className="me-3">{currentQuiz?.quiz?.title}</span>
+						<Badge bg={timeLeft < 60 ? "danger" : "primary"}>
 							<Clock size={12} className="me-1" />
 							{formatTime(timeLeft)}
-						</span>
+						</Badge>
 					</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -523,7 +646,7 @@ const Quiz = () => {
 						<ProgressBar
 							now={
 								((currentQuestionIndex + 1) /
-									(currentQuiz?.questions?.length || 1)) *
+									(currentQuiz?.quiz?.questions?.length || 1)) *
 								100
 							}
 							className="mb-2"
@@ -531,7 +654,7 @@ const Quiz = () => {
 						<div className="d-flex justify-content-between text-muted small">
 							<span>
 								Question {currentQuestionIndex + 1} of{" "}
-								{currentQuiz?.questions?.length}
+								{currentQuiz?.quiz?.questions?.length || 0}
 							</span>
 							<span>
 								{userAnswers.filter((answer) => answer !== "").length} answered
@@ -564,13 +687,15 @@ const Quiz = () => {
 						</small>
 					</div>
 					<Button variant="primary" onClick={handleNextQuestion}>
-						{currentQuestionIndex === (currentQuiz?.questions?.length || 1) - 1
+						{currentQuestionIndex ===
+						(currentQuiz?.quiz?.questions?.length || 1) - 1
 							? "Submit Quiz"
 							: "Next"}
 					</Button>
 				</Modal.Footer>
 			</Modal>
 
+			{/* Quiz Results Modal */}
 			<Modal
 				show={showResultsModal}
 				onHide={() => setShowResultsModal(false)}
@@ -637,7 +762,7 @@ const Quiz = () => {
 										<Card.Body>
 											<Clock className="text-info mb-2" size={24} />
 											<h5 className="fw-bold">
-												{formatTime(quizResults.timeTaken)}
+												{formatTime(quizResults.timeTaken || 0)}
 											</h5>
 											<small className="text-muted">Time Taken</small>
 										</Card.Body>
@@ -678,8 +803,76 @@ const Quiz = () => {
 						Close
 					</Button>
 					<Button variant="primary" onClick={() => setShowResultsModal(false)}>
-						<RefreshCw size={16} className="me-2" />
-						Take Another Quiz
+						<div className="d-flex justify-content-between align-items-center">
+							<RefreshCw size={16} className="me-2" />
+							<span>Take Another Quiz</span>
+						</div>
+					</Button>
+				</Modal.Footer>
+			</Modal>
+
+			{/* Quiz History Modal */}
+			<Modal
+				show={showHistoryModal}
+				onHide={() => setShowHistoryModal(false)}
+				size="lg"
+			>
+				<Modal.Header closeButton>
+					<Modal.Title>Quiz History</Modal.Title>
+				</Modal.Header>
+				<Modal.Body>
+					{quizHistory.length > 0 ? (
+						<div className="list-group">
+							{quizHistory.map((session, index) => (
+								<div
+									key={session._id || index}
+									className="list-group-item border-0 shadow-sm mb-3 rounded"
+								>
+									<div className="d-flex justify-content-between align-items-start">
+										<div>
+											<h6 className="fw-bold mb-1">
+												{session.quizId?.title || "Quiz"}
+											</h6>
+											<p className="text-muted mb-2">
+												Score: {session.score}% ({session.correctAnswers}/
+												{session.totalQuestions})
+											</p>
+											<small className="text-muted">
+												<Calendar size={12} className="me-1" />
+												{new Date(session.completedAt).toLocaleDateString()}
+											</small>
+										</div>
+										<Badge
+											bg={
+												session.score >= 80
+													? "success"
+													: session.score >= 60
+													? "warning"
+													: "danger"
+											}
+										>
+											{session.score}%
+										</Badge>
+									</div>
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="text-center py-4">
+							<BarChart3 size={48} className="text-muted mb-3" />
+							<h5 className="text-muted mb-2">No quiz history</h5>
+							<p className="text-muted">
+								Complete some quizzes to see your history here.
+							</p>
+						</div>
+					)}
+				</Modal.Body>
+				<Modal.Footer>
+					<Button
+						variant="secondary"
+						onClick={() => setShowHistoryModal(false)}
+					>
+						Close
 					</Button>
 				</Modal.Footer>
 			</Modal>
