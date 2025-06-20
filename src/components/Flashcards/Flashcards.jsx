@@ -461,7 +461,7 @@ const Flashcards = () => {
 						return (
 							<Col key={deck._id} md={6} lg={4}>
 								<Card className="h-100 border-0 shadow-sm hover-lift">
-									<Card.Body>
+									<Card.Body className="d-flex flex-column">
 										<div className="d-flex justify-content-between align-items-start mb-3">
 											<h5 className="fw-bold mb-0">{deck.name}</h5>
 											<Badge bg="secondary">
@@ -491,6 +491,8 @@ const Flashcards = () => {
 												Created {new Date(deck.createdAt).toLocaleDateString()}
 											</small>
 										</div>
+
+										<div className="flex-grow-1"></div>
 
 										<div className="d-flex gap-2">
 											<Button

@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: process.env.FRONTEND_URL,
   credentials: true
 }));
 
@@ -23,31 +23,31 @@ const limiter = rateLimit({
 app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 
-const authProxy = proxy('http://localhost:3001', {
+const authProxy = proxy(process.env.AUTH_SERVICE_URL, {
   proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/auth/, '') || '/'
 });
 
-const notesProxy = proxy('http://localhost:3002', {
+const notesProxy = proxy(process.env.NOTES_SERVICE_URL, {
   proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/notes/, '') || '/'
 });
 
-const flashcardsProxy = proxy('http://localhost:3003', {
+const flashcardsProxy = proxy(process.env.FLASHCARD_SERVICE_URL, {
   proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/flashcards/, '') || '/'
 });
 
-const quizProxy = proxy('http://localhost:3004', {
+const quizProxy = proxy(process.env.QUIZ_SERVICE_URL, {
   proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/quizzes/, '') || '/'
 });
 
-const dashboardProxy = proxy('http://localhost:3001', {
-  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/dashboard/, '/dashboard') || '/dashboard'
+const statsProxy = proxy(process.env.STATS_SERVICE_URL, {
+  proxyReqPathResolver: req => req.originalUrl.replace(/^\/api\/stats/, '/stats') || '/stats'
 });
 
 app.use('/api/auth', authProxy);
 app.use('/api/notes', notesProxy);
 app.use('/api/flashcards', flashcardsProxy);
 app.use('/api/quizzes', quizProxy);
-app.use('/api/dashboard', dashboardProxy);
+app.use('/api/stats', statsProxy);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

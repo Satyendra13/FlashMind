@@ -28,6 +28,8 @@ import {
 	LineChart,
 	Line,
 } from "recharts";
+import QuickActionCard from "./QuickActionCard";
+import StatCard from "./StatCard";
 
 const Dashboard = () => {
 	const { user } = useAuth();
@@ -38,6 +40,11 @@ const Dashboard = () => {
 		completedQuizzes: 0,
 		averageScore: 0,
 		studyStreak: 0,
+		totalNotesTrend: 0,
+		totalFlashcardsTrend: 0,
+		totalQuizzesTrend: 0,
+		completedQuizzesTrend: 0,
+		averageScoreTrend: 0,
 	});
 	const [recentActivity, setRecentActivity] = useState([]);
 	const [performanceData, setPerformanceData] = useState([]);
@@ -50,17 +57,17 @@ const Dashboard = () => {
 	const fetchDashboardData = async () => {
 		try {
 			const [statsRes, activityRes, performanceRes] = await Promise.all([
-				axios.get("/dashboard/stats", {
+				axios.get("/stats", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/dashboard/recent-activity", {
+				axios.get("/stats/recent-activity", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/dashboard/performance", {
+				axios.get("/stats/performance", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
@@ -96,71 +103,6 @@ const Dashboard = () => {
 		}
 	};
 
-	const StatCard = ({
-		title,
-		value,
-		icon: Icon,
-		color,
-		trend,
-		description,
-	}) => (
-		<Card className="h-100 border-0 shadow-sm hover-lift">
-			<Card.Body className="d-flex align-items-center">
-				<div className={`rounded-circle p-3 me-3 bg-${color} bg-opacity-10`}>
-					<Icon className={`text-${color}`} size={24} />
-				</div>
-				<div className="flex-grow-1">
-					<h6 className="text-muted mb-1 fw-normal">{title}</h6>
-					<h3 className="mb-0 fw-bold">{value}</h3>
-					{trend !== undefined && (
-						<small
-							className={`text-${
-								trend > 0 ? "success" : trend < 0 ? "danger" : "muted"
-							}`}
-						>
-							<TrendingUp size={12} className="me-1" />
-							{trend > 0 ? "+" : ""}
-							{trend}%
-						</small>
-					)}
-					{description && (
-						<small className="text-muted d-block">{description}</small>
-					)}
-				</div>
-			</Card.Body>
-		</Card>
-	);
-
-	const QuickActionCard = ({
-		title,
-		description,
-		icon: Icon,
-		color,
-		to,
-		action,
-	}) => (
-		<Card className="h-100 border-0 shadow-sm hover-lift">
-			<Card.Body className="text-center p-4">
-				<div
-					className={`rounded-circle p-3 mx-auto mb-3 bg-${color} bg-opacity-10 d-inline-flex`}
-				>
-					<Icon className={`text-${color}`} size={32} />
-				</div>
-				<h5 className="fw-bold mb-2">{title}</h5>
-				<p className="text-muted mb-3">{description}</p>
-				{to ? (
-					<Button as={Link} to={to} variant={color} size="sm">
-						Get Started
-					</Button>
-				) : (
-					<Button variant={color} size="sm" onClick={action}>
-						Get Started
-					</Button>
-				)}
-			</Card.Body>
-		</Card>
-	);
-
 	if (loading) {
 		return (
 			<div className="d-flex justify-content-center align-items-center min-vh-100">
@@ -190,7 +132,7 @@ const Dashboard = () => {
 						value={stats.totalNotes}
 						icon={FileText}
 						color="primary"
-						trend={12}
+						trend={stats.totalNotesTrend}
 						description="Study materials uploaded"
 					/>
 				</Col>
@@ -200,7 +142,7 @@ const Dashboard = () => {
 						value={stats.totalFlashcards}
 						icon={Brain}
 						color="success"
-						trend={8}
+						trend={stats.totalQuizzesTrend}
 						description="AI-generated cards"
 					/>
 				</Col>
@@ -210,7 +152,7 @@ const Dashboard = () => {
 						value={stats.completedQuizzes}
 						icon={Award}
 						color="warning"
-						trend={-2}
+						trend={stats.completedQuizzesTrend}
 						description="Knowledge assessments"
 					/>
 				</Col>
@@ -220,7 +162,7 @@ const Dashboard = () => {
 						value={`${stats.averageScore}%`}
 						icon={Target}
 						color="info"
-						trend={5}
+						trend={stats.averageScoreTrend}
 						description="Quiz performance"
 					/>
 				</Col>
@@ -303,7 +245,7 @@ const Dashboard = () => {
 							background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
 						}}
 					>
-						<Card.Body className="text-white">
+						<Card.Body className="text-bold">
 							<Row className="align-items-center">
 								<Col md={8}>
 									<h4 className="fw-bold mb-2">🔥 Study Streak</h4>
