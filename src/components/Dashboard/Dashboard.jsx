@@ -57,17 +57,17 @@ const Dashboard = () => {
 	const fetchDashboardData = async () => {
 		try {
 			const [statsRes, activityRes, performanceRes] = await Promise.all([
-				axios.get("/stats", {
+				axios.get("/content/stats", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/stats/recent-activity", {
+				axios.get("/content/stats/recent-activity", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/stats/performance", {
+				axios.get("/content/stats/performance", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
@@ -112,6 +112,15 @@ const Dashboard = () => {
 			</div>
 		);
 	}
+	const formatDate = (dateString) => {
+		return new Date(dateString).toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "short",
+			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	};
 
 	return (
 		<Container fluid className="py-4">
@@ -175,8 +184,10 @@ const Dashboard = () => {
 						<Card.Header className="bg-white border-0 py-3">
 							<div className="d-flex justify-content-between align-items-center">
 								<h5 className="fw-bold mb-0">
-									<Activity size={20} className="me-2" />
-									Performance Overview
+									<div className="d-flex align-items-center">
+										<Activity size={20} className="me-2" />
+										<span>Performance Overview</span>
+									</div>
 								</h5>
 								<small className="text-muted">Last 7 days</small>
 							</div>
@@ -198,8 +209,10 @@ const Dashboard = () => {
 					<Card className="border-0 shadow-sm">
 						<Card.Header className="bg-white border-0 py-3">
 							<h5 className="fw-bold mb-0">
-								<Clock size={20} className="me-2" />
-								Recent Activity
+								<div className="d-flex align-items-center">
+									<Clock size={20} className="me-2" />
+									<span>Recent Activity</span>
+								</div>
 							</h5>
 						</Card.Header>
 						<Card.Body className="px-0">
@@ -213,9 +226,9 @@ const Dashboard = () => {
 												</div>
 												<div className="flex-grow-1">
 													<h6 className="mb-1">{activity.title}</h6>
-													<small className="text-muted">
+													<small className="text-muted d-flex align-items-center">
 														<Calendar size={12} className="me-1" />
-														{activity.time}
+														{formatDate(activity.time)}
 													</small>
 												</div>
 											</div>
@@ -224,8 +237,10 @@ const Dashboard = () => {
 								</div>
 							) : (
 								<div className="text-center py-4">
-									<Clock size={48} className="text-muted mb-3" />
-									<p className="text-muted mb-0">No recent activity</p>
+									<div className="d-flex align-items-center">
+										<Clock size={48} className="text-muted mb-3" />
+										<p className="text-muted mb-0">No recent activity</p>
+									</div>
 									<small className="text-muted">
 										Start studying to see your activity here
 									</small>

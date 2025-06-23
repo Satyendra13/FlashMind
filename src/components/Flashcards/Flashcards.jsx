@@ -73,17 +73,17 @@ const Flashcards = () => {
 	const fetchData = async () => {
 		try {
 			const [flashcardsRes, decksRes, notesRes] = await Promise.all([
-				axios.get("/flashcards", {
+				axios.get("/content/flashcards", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/flashcards/decks", {
+				axios.get("/content/flashcards/decks", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/notes", {
+				axios.get("/content/notes", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
@@ -109,7 +109,7 @@ const Flashcards = () => {
 			}
 
 			const response = await axios.post(
-				"/flashcards/generate",
+				"/content/flashcards/generate",
 				generateOptions,
 				{
 					headers: {
@@ -140,7 +140,7 @@ const Flashcards = () => {
 				return;
 			}
 
-			await axios.post("/flashcards/deck", newDeck, {
+			await axios.post("/content/flashcards/deck", newDeck, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
@@ -167,7 +167,7 @@ const Flashcards = () => {
 			)
 		) {
 			try {
-				await axios.delete(`/flashcards/deck/${deckId}`, {
+				await axios.delete(`/content/flashcards/deck/${deckId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
@@ -212,7 +212,7 @@ const Flashcards = () => {
 		// Record the review
 		try {
 			await axios.post(
-				`/flashcards/${currentCard._id}/review`,
+				`/content/flashcards/${currentCard._id}/review`,
 				{
 					isCorrect,
 				},
@@ -269,7 +269,7 @@ const Flashcards = () => {
 				return;
 			}
 
-			await axios.put(`/flashcards/${selectedCard._id}`, editCard, {
+			await axios.put(`/content/flashcards/${selectedCard._id}`, editCard, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
@@ -288,7 +288,7 @@ const Flashcards = () => {
 	const deleteCard = async (cardId) => {
 		if (window.confirm("Are you sure you want to delete this card?")) {
 			try {
-				await axios.delete(`/flashcards/${cardId}`, {
+				await axios.delete(`/content/flashcards/${cardId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},

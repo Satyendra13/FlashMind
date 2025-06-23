@@ -76,23 +76,23 @@ const Quiz = () => {
 	const fetchData = async () => {
 		try {
 			const [quizzesRes, notesRes, decksRes, historyRes] = await Promise.all([
-				axios.get("/quizzes", {
+				axios.get("/content/quizzes", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/notes", {
+				axios.get("/content/notes", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
-				axios.get("/flashcards/decks", {
+				axios.get("/content/flashcards/decks", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				}),
 				axios
-					.get("/quizzes/sessions/history", {
+					.get("/content/quizzes/sessions/history", {
 						headers: {
 							Authorization: `Bearer ${localStorage.getItem("token")}`,
 						},
@@ -119,7 +119,7 @@ const Quiz = () => {
 				return;
 			}
 
-			const response = await axios.post("/quizzes/generate", generateOptions, {
+			const response = await axios.post("/content/quizzes/generate", generateOptions, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
@@ -145,7 +145,7 @@ const Quiz = () => {
 		try {
 			// Start quiz session
 			const response = await axios.post(
-				`/quizzes/${quiz._id}/start`,
+				`/content/quizzes/${quiz._id}/start`,
 				{},
 				{
 					headers: {
@@ -192,7 +192,7 @@ const Quiz = () => {
 	const handleSubmitQuiz = async () => {
 		try {
 			const response = await axios.post(
-				`/quizzes/${currentQuiz?.quiz?._id}/complete`,
+				`/content/quizzes/${currentQuiz?.quiz?._id}/complete`,
 				{
 					sessionId: currentQuiz.sessionId,
 					answers: userAnswers,
@@ -217,7 +217,7 @@ const Quiz = () => {
 	const deleteQuiz = async (quizId) => {
 		if (window.confirm("Are you sure you want to delete this quiz?")) {
 			try {
-				await axios.delete(`/quizzes/${quizId}`, {
+				await axios.delete(`/content/quizzes/${quizId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
@@ -259,9 +259,9 @@ const Quiz = () => {
 				</div>
 
 				<div className="d-flex justify-content-between align-items-center">
-					<small className="text-muted">
+					<small className="text-muted d-flex align-items-center">
 						<Calendar size={12} className="me-1" />
-						{new Date(quiz.createdAt).toLocaleDateString()}
+						<span>{new Date(quiz.createdAt).toLocaleDateString()}</span>
 					</small>
 					<div className="btn-group">
 						<Button variant="primary" size="sm" onClick={() => startQuiz(quiz)}>
@@ -837,9 +837,9 @@ const Quiz = () => {
 												Score: {session.score}% ({session.correctAnswers}/
 												{session.totalQuestions})
 											</p>
-											<small className="text-muted">
+											<small className="text-muted d-flex align-items-center">
 												<Calendar size={12} className="me-1" />
-												{new Date(session.completedAt).toLocaleDateString()}
+												<span>{new Date(session.completedAt).toLocaleDateString()}</span>
 											</small>
 										</div>
 										<Badge

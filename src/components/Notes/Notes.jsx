@@ -30,6 +30,8 @@ import {
 	Folder,
 	Calendar,
 } from "lucide-react";
+import NotesGrid from "./NotesGrid";
+import NotesList from "./NotesList";
 
 const Notes = () => {
 	const [notes, setNotes] = useState([]);
@@ -70,7 +72,7 @@ const Notes = () => {
 
 	const fetchNotes = async () => {
 		try {
-			const response = await axios.get("/notes", {
+			const response = await axios.get("/content/notes", {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
@@ -117,15 +119,15 @@ const Notes = () => {
 		setUploadProgress(0);
 
 		try {
+			console.log(acceptedFiles, "acceptedFiles");
 			for (let i = 0; i < acceptedFiles.length; i++) {
 				const file = acceptedFiles[i];
 				const formData = new FormData();
 				formData.append("file", file);
 				formData.append("folder", "General");
-
-				await axios.post("/notes/upload", formData, {
+				console.log(file, "file");
+				await axios.post("/content/notes/upload", formData, {
 					headers: {
-						"Content-Type": "multipart/form-data",
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 					onUploadProgress: (progressEvent) => {
@@ -171,7 +173,7 @@ const Notes = () => {
 				return;
 			}
 
-			await axios.post("/notes/manual", newNote, {
+			await axios.post("/content/notes/manual", newNote, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
@@ -199,7 +201,7 @@ const Notes = () => {
 				return;
 			}
 
-			await axios.put(`/notes/${selectedNote._id}`, editNote, {
+			await axios.put(`/content/notes/${selectedNote._id}`, editNote, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
@@ -218,7 +220,7 @@ const Notes = () => {
 	const deleteNote = async (noteId) => {
 		if (window.confirm("Are you sure you want to delete this note?")) {
 			try {
-				await axios.delete(`/notes/${noteId}`, {
+				await axios.delete(`/content/notes/${noteId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
@@ -288,160 +290,6 @@ const Notes = () => {
 			minute: "2-digit",
 		});
 	};
-
-	const NotesGrid = () => (
-		<Row className="g-4">
-			{filteredNotes.map((note) => (
-				<Col key={note._id} md={6} lg={4}>
-					<Card className="h-100 border-0 shadow-sm hover-lift">
-						<Card.Body>
-							<div className="d-flex justify-content-between align-items-start mb-2">
-								<h6 className="fw-bold mb-0" style={{ fontSize: "1rem" }}>
-									{note.title}
-								</h6>
-								<Badge bg="secondary" className="small">
-									{note.folder}
-								</Badge>
-							</div>
-
-							<p
-								className="text-muted small mb-3"
-								style={{
-									overflow: "hidden",
-									display: "-webkit-box",
-									WebkitLineClamp: 3,
-									WebkitBoxOrient: "vertical",
-								}}
-							>
-								{note.content}
-							</p>
-
-							{note.tags && note.tags.length > 0 && (
-								<div className="mb-3">
-									{note.tags.map((tag, index) => (
-										<Badge
-											key={index}
-											bg="light"
-											text="dark"
-											className="me-1 small"
-										>
-											<Tag size={10} className="me-1" />
-											{tag}
-										</Badge>
-									))}
-								</div>
-							)}
-
-							<div className="d-flex justify-content-between align-items-center">
-								<small className="text-muted">
-									<Calendar size={12} className="me-1" />
-									{formatDate(note.createdAt)}
-								</small>
-								<div className="btn-group" role="group">
-									<Button
-										variant="outline-primary"
-										size="sm"
-										onClick={() => viewNote(note)}
-									>
-										<Eye size={12} />
-									</Button>
-									<Button
-										variant="outline-secondary"
-										size="sm"
-										onClick={() => editNoteHandler(note)}
-									>
-										<Edit size={12} />
-									</Button>
-									<Button
-										variant="outline-danger"
-										size="sm"
-										onClick={() => deleteNote(note._id)}
-									>
-										<Trash2 size={12} />
-									</Button>
-								</div>
-							</div>
-						</Card.Body>
-					</Card>
-				</Col>
-			))}
-		</Row>
-	);
-
-	const NotesList = () => (
-		<div className="list-group">
-			{filteredNotes.map((note) => (
-				<div
-					key={note._id}
-					className="list-group-item border-0 shadow-sm mb-3 rounded"
-				>
-					<div className="d-flex justify-content-between align-items-start">
-						<div className="flex-grow-1">
-							<div className="d-flex align-items-center mb-2">
-								<h6 className="fw-bold mb-0 me-3">{note.title}</h6>
-								<Badge bg="secondary" className="small">
-									{note.folder}
-								</Badge>
-							</div>
-							<p
-								className="text-muted mb-2"
-								style={{
-									overflow: "hidden",
-									display: "-webkit-box",
-									WebkitLineClamp: 2,
-									WebkitBoxOrient: "vertical",
-								}}
-							>
-								{note.content}
-							</p>
-							{note.tags && note.tags.length > 0 && (
-								<div className="mb-2">
-									{note.tags.map((tag, index) => (
-										<Badge
-											key={index}
-											bg="light"
-											text="dark"
-											className="me-1 small"
-										>
-											<Tag size={10} className="me-1" />
-											{tag}
-										</Badge>
-									))}
-								</div>
-							)}
-							<small className="text-muted">
-								<Calendar size={12} className="me-1" />
-								{formatDate(note.createdAt)}
-							</small>
-						</div>
-						<div className="btn-group" role="group">
-							<Button
-								variant="outline-primary"
-								size="sm"
-								onClick={() => viewNote(note)}
-							>
-								<Eye size={12} />
-							</Button>
-							<Button
-								variant="outline-secondary"
-								size="sm"
-								onClick={() => editNoteHandler(note)}
-							>
-								<Edit size={12} />
-							</Button>
-							<Button
-								variant="outline-danger"
-								size="sm"
-								onClick={() => deleteNote(note._id)}
-							>
-								<Trash2 size={12} />
-							</Button>
-						</div>
-					</div>
-				</div>
-			))}
-		</div>
-	);
 
 	if (loading) {
 		return (
@@ -536,9 +384,19 @@ const Notes = () => {
 
 			{filteredNotes.length > 0 ? (
 				viewMode === "grid" ? (
-					<NotesGrid />
+					<NotesGrid
+						filteredNotes={filteredNotes}
+						viewNote={viewNote}
+						editNoteHandler={editNoteHandler}
+						deleteNote={deleteNote}
+					/>
 				) : (
-					<NotesList />
+					<NotesList
+						filteredNotes={filteredNotes}
+						viewNote={viewNote}
+						editNoteHandler={editNoteHandler}
+						deleteNote={deleteNote}
+					/>
 				)
 			) : (
 				<div className="text-center py-5">
@@ -572,10 +430,12 @@ const Notes = () => {
 				<Modal.Body>
 					<div
 						{...getRootProps()}
-						className={`dropzone ${isDragActive ? "active" : ""}`}
+						className={`dropzone text-center ${isDragActive ? "active" : ""}`}
 					>
 						<input {...getInputProps()} />
-						<Upload size={48} className="text-muted mb-3" />
+						<span>
+							<Upload size={48} className="text-muted mb-3" />
+						</span>
 						<h5 className="mb-2">
 							{isDragActive ? "Drop files here" : "Drag & drop files here"}
 						</h5>
@@ -804,20 +664,26 @@ const Notes = () => {
 						<>
 							<div className="mb-3">
 								<Badge bg="secondary" className="me-2">
-									<Folder size={12} className="me-1" />
-									{selectedNote.folder}
+									<div className="d-flex align-items-center">
+										<Folder size={12} className="me-1" />
+										<span>{selectedNote.folder}</span>
+									</div>
 								</Badge>
 								<small className="text-muted">
-									<Calendar size={12} className="me-1" />
-									Created: {formatDate(selectedNote.createdAt)}
+									<div className="d-flex align-items-center">
+										<Calendar size={12} className="me-1" />
+										<span>Created: {formatDate(selectedNote.createdAt)}</span>
+									</div>
 								</small>
 							</div>
 							{selectedNote.tags && selectedNote.tags.length > 0 && (
 								<div className="mb-3">
 									{selectedNote.tags.map((tag, index) => (
 										<Badge key={index} bg="light" text="dark" className="me-1">
-											<Tag size={10} className="me-1" />
-											{tag}
+											<div className="d-flex align-items-center">
+												<Tag size={10} className="me-1" />
+												<span>{tag}</span>
+											</div>
 										</Badge>
 									))}
 								</div>
