@@ -1,0 +1,18 @@
+FROM node
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+RUN npm run build
+
+# Install a simple static file server
+RUN npm install -g serve
+
+EXPOSE 5173
+
+# Serve the built dist files
+CMD ["serve", "-s", "dist", "-l", "5173"]
