@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+    env_file: ./backend/api-gateway/.env
+    ports:
+      - "5000:5000"
+
+  auth-service:
+    build:
+      context: ./backend/auth-service
+    env_file: ./backend/auth-service/.env
+    ports:
+      - "5001:5001"
+    depends_on:
+      - api-gateway
+
+  ai-service:
+    build:
+      context: ./backend/ai-service
+    env_file: ./backend/ai-service/.env
+    ports:
+      - "5002:5002"
+    depends_on:
+      - auth-service
+      - content-service
+
+  content-service:
+    build:
+      context: ./backend/content-service
+    env_file: ./backend/content-service/.env
+    ports:
+      - "5003:5003"
+    depends_on:
+      - auth-service
+      - api-gateway
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      - VITE_API_URL=http://api-gateway:5000/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api-gateway
