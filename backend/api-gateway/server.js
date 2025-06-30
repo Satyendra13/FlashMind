@@ -13,7 +13,7 @@ app.use(requestLogger);
 app.use(helmet());
 app.use(
 	cors({
-		origin: "https://frontend-production-f9ec.up.railway.app/",
+		origin: config.FRONTEND_URL,
 		credentials: true,
 	})
 );
