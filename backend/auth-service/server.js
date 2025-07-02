@@ -31,7 +31,7 @@ app.use((err, req, res, next) => {
 	res.status(500).send("Something broke!");
 });
 
-const PORT = process.env.AUTH_PORT || 3001;
+const PORT = process.env.AUTH_PORT;
 
 connectDB()
 	.then(() => {
