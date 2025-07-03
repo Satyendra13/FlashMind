@@ -90,13 +90,17 @@ const Navbar = () => {
 								align="end"
 							>
 								<NavDropdown.Item as={Link} to="/profile">
-									<User size={16} className="me-2" />
-									Profile
+									<div className="d-flex align-items-center">
+										<User size={16} className="me-2" />
+										<span>Profile</span>
+									</div>
 								</NavDropdown.Item>
 								<NavDropdown.Divider />
 								<NavDropdown.Item onClick={handleLogout}>
-									<LogOut size={16} className="me-2" />
-									Logout
+									<div className="d-flex align-items-center">
+										<LogOut size={16} className="me-2" />
+										<span>Logout</span>
+									</div>
 								</NavDropdown.Item>
 							</NavDropdown>
 						) : (

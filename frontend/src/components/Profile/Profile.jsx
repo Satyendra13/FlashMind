@@ -1,251 +1,300 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Tab, Tabs } from 'react-bootstrap';
-import { useAuth } from '../../contexts/AuthContext';
-import { User, Lock, Settings, Bell } from 'lucide-react';
+import React, { useState } from "react";
+import {
+	Container,
+	Row,
+	Col,
+	Card,
+	Form,
+	Button,
+	Alert,
+	Tab,
+	Tabs,
+} from "react-bootstrap";
+import { useAuth } from "../../contexts/AuthContext";
+import { User, Lock, Settings, Bell } from "lucide-react";
 
 const Profile = () => {
-  const { user, updateProfile, changePassword } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  
-  const [profileData, setProfileData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || ''
-  });
+	const { user, updateProfile, changePassword } = useAuth();
+	const [loading, setLoading] = useState(false);
+	const [message, setMessage] = useState("");
+	const [error, setError] = useState("");
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
+	const [profileData, setProfileData] = useState({
+		firstName: user?.firstName || "",
+		lastName: user?.lastName || "",
+		email: user?.email || "",
+	});
 
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    studyReminders: true,
-    weeklyReports: false,
-    darkMode: false
-  });
+	const [passwordData, setPasswordData] = useState({
+		currentPassword: "",
+		newPassword: "",
+		confirmPassword: "",
+	});
 
-  const handleProfileUpdate = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setError('');
+	const [preferences, setPreferences] = useState({
+		emailNotifications: true,
+		studyReminders: true,
+		weeklyReports: false,
+		darkMode: false,
+	});
 
-    const result = await updateProfile(profileData);
-    
-    if (result.success) {
-      setMessage('Profile updated successfully!');
-    } else {
-      setError(result.message);
-    }
-    
-    setLoading(false);
-  };
+	const handleProfileUpdate = async (e) => {
+		e.preventDefault();
+		setLoading(true);
+		setMessage("");
+		setError("");
 
-  const handlePasswordChange = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setError('');
+		const result = await updateProfile(profileData);
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('New passwords do not match');
-      setLoading(false);
-      return;
-    }
+		if (result.success) {
+			setMessage("Profile updated successfully!");
+		} else {
+			setError(result.message);
+		}
 
-    const result = await changePassword(
-      passwordData.currentPassword,
-      passwordData.newPassword,
-      passwordData.confirmPassword
-    );
-    
-    if (result.success) {
-      setMessage('Password changed successfully!');
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-    } else {
-      setError(result.message);
-    }
-    
-    setLoading(false);
-  };
+		setLoading(false);
+	};
 
-  const handlePreferencesUpdate = async (e) => {
-    e.preventDefault();
-    setMessage('Preferences updated successfully!');
-  };
+	const handlePasswordChange = async (e) => {
+		e.preventDefault();
+		setLoading(true);
+		setMessage("");
+		setError("");
 
-  return (
-    <Container className="py-4">
-      <Row className="justify-content-center">
-        <Col lg={8}>
-          <Card className="border-0 shadow-sm">
-            <Card.Header className="bg-white border-0 py-3">
-              <h3 className="fw-bold mb-0">
-                <User size={24} className="me-2" />
-                Profile Settings
-              </h3>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <Tabs defaultActiveKey="profile" className="border-0">
-                <Tab eventKey="profile" title={
-                  <span>
-                    <User size={16} className="me-2" />
-                    Profile
-                  </span>
-                }>
-                  <div className="p-4">
-                    {(message || error) && (
-                      <Alert variant={message ? 'success' : 'danger'} className="mb-4">
-                        {message || error}
-                      </Alert>
-                    )}
+		if (passwordData.newPassword !== passwordData.confirmPassword) {
+			setError("New passwords do not match");
+			setLoading(false);
+			return;
+		}
 
-                    <Form onSubmit={handleProfileUpdate}>
-                      <Row>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">First Name</Form.Label>
-                            <Form.Control
-                              type="text"
-                              value={profileData.firstName}
-                              onChange={(e) => setProfileData({
-                                ...profileData,
-                                firstName: e.target.value
-                              })}
-                              placeholder="Enter your first name"
-                              required
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Last Name</Form.Label>
-                            <Form.Control
-                              type="text"
-                              value={profileData.lastName}
-                              onChange={(e) => setProfileData({
-                                ...profileData,
-                                lastName: e.target.value
-                              })}
-                              placeholder="Enter your last name"
-                              required
-                            />
-                          </Form.Group>
-                        </Col>
-                      </Row>
+		const result = await changePassword(
+			passwordData.currentPassword,
+			passwordData.newPassword,
+			passwordData.confirmPassword
+		);
 
-                      <Form.Group className="mb-4">
-                        <Form.Label className="fw-semibold">Email Address</Form.Label>
-                        <Form.Control
-                          type="email"
-                          value={profileData.email}
-                          onChange={(e) => setProfileData({
-                            ...profileData,
-                            email: e.target.value
-                          })}
-                          placeholder="Enter your email"
-                          required
-                        />
-                      </Form.Group>
+		if (result.success) {
+			setMessage("Password changed successfully!");
+			setPasswordData({
+				currentPassword: "",
+				newPassword: "",
+				confirmPassword: "",
+			});
+		} else {
+			setError(result.message);
+		}
 
-                      <Button 
-                        type="submit" 
-                        variant="primary" 
-                        disabled={loading}
-                        className="px-4"
-                      >
-                        {loading ? (
-                          <span className="loading-spinner me-2"></span>
-                        ) : null}
-                        {loading ? 'Updating...' : 'Update Profile'}
-                      </Button>
-                    </Form>
-                  </div>
-                </Tab>
+		setLoading(false);
+	};
 
-                <Tab eventKey="password" title={
-                  <span>
-                    <Lock size={16} className="me-2" />
-                    Password
-                  </span>
-                }>
-                  <div className="p-4">
-                    {(message || error) && (
-                      <Alert variant={message ? 'success' : 'danger'} className="mb-4">
-                        {message || error}
-                      </Alert>
-                    )}
+	const handlePreferencesUpdate = async (e) => {
+		e.preventDefault();
+		setMessage("Preferences updated successfully!");
+	};
 
-                    <Form onSubmit={handlePasswordChange}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="fw-semibold">Current Password</Form.Label>
-                        <Form.Control
-                          type="password"
-                          value={passwordData.currentPassword}
-                          onChange={(e) => setPasswordData({
-                            ...passwordData,
-                            currentPassword: e.target.value
-                          })}
-                          placeholder="Enter your current password"
-                          required
-                        />
-                      </Form.Group>
+	return (
+		<Container className="py-4">
+			<Row className="justify-content-center">
+				<Col lg={8}>
+					<Card className="border-0 shadow-sm">
+						<Card.Header className="bg-white border-0 py-3">
+							<h3 className="fw-bold mb-0">
+								<div className="d-flex align-items-center">
+									<User size={24} className="me-2" />
+									<span>Profile Settings</span>
+								</div>
+							</h3>
+						</Card.Header>
+						<Card.Body className="p-0">
+							<Tabs defaultActiveKey="profile" className="border-0">
+								<Tab
+									eventKey="profile"
+									title={
+										<div className="d-flex align-items-center">
+											<User size={16} className="me-2" />
+											<span>Password</span>
+										</div>
+									}
+								>
+									<div className="p-4">
+										{(message || error) && (
+											<Alert
+												variant={message ? "success" : "danger"}
+												className="mb-4"
+											>
+												{message || error}
+											</Alert>
+										)}
 
-                      <Form.Group className="mb-3">
-                        <Form.Label className="fw-semibold">New Password</Form.Label>
-                        <Form.Control
-                          type="password"
-                          value={passwordData.newPassword}
-                          onChange={(e) => setPasswordData({
-                            ...passwordData,
-                            newPassword: e.target.value
-                          })}
-                          placeholder="Enter your new password"
-                          required
-                        />
-                        <Form.Text className="text-muted">
-                          Password must be at least 8 characters with uppercase, lowercase, number, and special character.
-                        </Form.Text>
-                      </Form.Group>
+										<Form onSubmit={handleProfileUpdate}>
+											<Row>
+												<Col md={6}>
+													<Form.Group className="mb-3">
+														<Form.Label className="fw-semibold">
+															First Name
+														</Form.Label>
+														<Form.Control
+															type="text"
+															value={profileData.firstName}
+															onChange={(e) =>
+																setProfileData({
+																	...profileData,
+																	firstName: e.target.value,
+																})
+															}
+															placeholder="Enter your first name"
+															required
+														/>
+													</Form.Group>
+												</Col>
+												<Col md={6}>
+													<Form.Group className="mb-3">
+														<Form.Label className="fw-semibold">
+															Last Name
+														</Form.Label>
+														<Form.Control
+															type="text"
+															value={profileData.lastName}
+															onChange={(e) =>
+																setProfileData({
+																	...profileData,
+																	lastName: e.target.value,
+																})
+															}
+															placeholder="Enter your last name"
+															required
+														/>
+													</Form.Group>
+												</Col>
+											</Row>
 
-                      <Form.Group className="mb-4">
-                        <Form.Label className="fw-semibold">Confirm New Password</Form.Label>
-                        <Form.Control
-                          type="password"
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => setPasswordData({
-                            ...passwordData,
-                            confirmPassword: e.target.value
-                          })}
-                          placeholder="Confirm your new password"
-                          required
-                        />
-                      </Form.Group>
+											<Form.Group className="mb-4">
+												<Form.Label className="fw-semibold">
+													Email Address
+												</Form.Label>
+												<Form.Control
+													type="email"
+													value={profileData.email}
+													onChange={(e) =>
+														setProfileData({
+															...profileData,
+															email: e.target.value,
+														})
+													}
+													placeholder="Enter your email"
+													required
+												/>
+											</Form.Group>
 
-                      <Button 
-                        type="submit" 
-                        variant="primary" 
-                        disabled={loading}
-                        className="px-4"
-                      >
-                        {loading ? (
-                          <span className="loading-spinner me-2"></span>
-                        ) : null}
-                        {loading ? 'Changing...' : 'Change Password'}
-                      </Button>
-                    </Form>
-                  </div>
-                </Tab>
+											<Button
+												type="submit"
+												variant="primary"
+												disabled={loading}
+												className="px-4"
+											>
+												{loading ? (
+													<span className="loading-spinner me-2"></span>
+												) : null}
+												{loading ? "Updating..." : "Update Profile"}
+											</Button>
+										</Form>
+									</div>
+								</Tab>
 
-                <Tab eventKey="preferences" title={
+								<Tab
+									eventKey="password"
+									title={
+										<div className="d-flex align-items-center">
+											<Lock size={16} className="me-2" />
+											<span>Password</span>
+										</div>
+									}
+								>
+									<div className="p-4">
+										{(message || error) && (
+											<Alert
+												variant={message ? "success" : "danger"}
+												className="mb-4"
+											>
+												{message || error}
+											</Alert>
+										)}
+
+										<Form onSubmit={handlePasswordChange}>
+											<Form.Group className="mb-3">
+												<Form.Label className="fw-semibold">
+													Current Password
+												</Form.Label>
+												<Form.Control
+													type="password"
+													value={passwordData.currentPassword}
+													onChange={(e) =>
+														setPasswordData({
+															...passwordData,
+															currentPassword: e.target.value,
+														})
+													}
+													placeholder="Enter your current password"
+													required
+												/>
+											</Form.Group>
+
+											<Form.Group className="mb-3">
+												<Form.Label className="fw-semibold">
+													New Password
+												</Form.Label>
+												<Form.Control
+													type="password"
+													value={passwordData.newPassword}
+													onChange={(e) =>
+														setPasswordData({
+															...passwordData,
+															newPassword: e.target.value,
+														})
+													}
+													placeholder="Enter your new password"
+													required
+												/>
+												<Form.Text className="text-muted">
+													Password must be at least 8 characters with uppercase,
+													lowercase, number, and special character.
+												</Form.Text>
+											</Form.Group>
+
+											<Form.Group className="mb-4">
+												<Form.Label className="fw-semibold">
+													Confirm New Password
+												</Form.Label>
+												<Form.Control
+													type="password"
+													value={passwordData.confirmPassword}
+													onChange={(e) =>
+														setPasswordData({
+															...passwordData,
+															confirmPassword: e.target.value,
+														})
+													}
+													placeholder="Confirm your new password"
+													required
+												/>
+											</Form.Group>
+
+											<Button
+												type="submit"
+												variant="primary"
+												disabled={loading}
+												className="px-4"
+											>
+												{loading ? (
+													<span className="loading-spinner me-2"></span>
+												) : null}
+												{loading ? "Changing..." : "Change Password"}
+											</Button>
+										</Form>
+									</div>
+								</Tab>
+
+								{/* <Tab eventKey="preferences" title={
                   <span>
                     <Settings size={16} className="me-2" />
                     Preferences
@@ -326,14 +375,14 @@ const Profile = () => {
                       </Button>
                     </Form>
                   </div>
-                </Tab>
-              </Tabs>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Container>
-  );
+                </Tab> */}
+							</Tabs>
+						</Card.Body>
+					</Card>
+				</Col>
+			</Row>
+		</Container>
+	);
 };
 
 export default Profile;
