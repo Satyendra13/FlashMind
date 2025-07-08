@@ -10,6 +10,7 @@ import {
 	Badge,
 	ProgressBar,
 	Alert,
+	Spinner,
 } from "react-bootstrap";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -65,6 +66,11 @@ const Flashcards = () => {
 		backContent: "",
 		difficulty: "medium",
 	});
+	const [generateLoading, setGenerateLoading] = useState(false);
+	const [createDeckLoading, setCreateDeckLoading] = useState(false);
+	const [deleteDeckLoading, setDeleteDeckLoading] = useState(null); // deckId or null
+	const [updateCardLoading, setUpdateCardLoading] = useState(false);
+	const [deleteCardLoading, setDeleteCardLoading] = useState(null); // cardId or null
 
 	useEffect(() => {
 		fetchData();
@@ -107,7 +113,7 @@ const Flashcards = () => {
 				toast.error("Please select a note");
 				return;
 			}
-
+			setGenerateLoading(true);
 			const response = await axios.post(
 				"/content/flashcards/generate",
 				generateOptions,
@@ -130,6 +136,8 @@ const Flashcards = () => {
 		} catch (error) {
 			console.error("Generate flashcards error:", error);
 			toast.error("Failed to generate flashcards");
+		} finally {
+			setGenerateLoading(false);
 		}
 	};
 
@@ -139,7 +147,7 @@ const Flashcards = () => {
 				toast.error("Deck name is required");
 				return;
 			}
-
+			setCreateDeckLoading(true);
 			await axios.post("/content/flashcards/deck", newDeck, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -157,6 +165,8 @@ const Flashcards = () => {
 		} catch (error) {
 			console.error("Create deck error:", error);
 			toast.error("Failed to create deck");
+		} finally {
+			setCreateDeckLoading(false);
 		}
 	};
 
@@ -167,6 +177,7 @@ const Flashcards = () => {
 			)
 		) {
 			try {
+				setDeleteDeckLoading(deckId);
 				await axios.delete(`/content/flashcards/deck/${deckId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -178,6 +189,8 @@ const Flashcards = () => {
 			} catch (error) {
 				console.error("Delete deck error:", error);
 				toast.error("Failed to delete deck");
+			} finally {
+				setDeleteDeckLoading(null);
 			}
 		}
 	};
@@ -268,7 +281,7 @@ const Flashcards = () => {
 				toast.error("Front and back content are required");
 				return;
 			}
-
+			setUpdateCardLoading(true);
 			await axios.put(`/content/flashcards/${selectedCard._id}`, editCard, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -282,12 +295,15 @@ const Flashcards = () => {
 		} catch (error) {
 			console.error("Update card error:", error);
 			toast.error("Failed to update card");
+		} finally {
+			setUpdateCardLoading(false);
 		}
 	};
 
 	const deleteCard = async (cardId) => {
 		if (window.confirm("Are you sure you want to delete this card?")) {
 			try {
+				setDeleteCardLoading(cardId);
 				await axios.delete(`/content/flashcards/${cardId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -299,6 +315,8 @@ const Flashcards = () => {
 			} catch (error) {
 				console.error("Delete card error:", error);
 				toast.error("Failed to delete card");
+			} finally {
+				setDeleteCardLoading(null);
 			}
 		}
 	};
@@ -384,17 +402,28 @@ const Flashcards = () => {
 						variant="outline-primary"
 						className="me-2"
 						onClick={() => setShowCreateDeckModal(true)}
+						disabled={createDeckLoading}
 					>
 						<div className="d-flex justify-content-between align-items-center">
 							<Plus size={16} className="me-2" />
 							<span>Create Deck</span>
 						</div>
+						{createDeckLoading && (
+							<Spinner size="sm" animation="border" className="ms-2" />
+						)}
 					</Button>
-					<Button variant="primary" onClick={() => setShowGenerateModal(true)}>
+					<Button
+						variant="primary"
+						onClick={() => setShowGenerateModal(true)}
+						disabled={generateLoading}
+					>
 						<div className="d-flex justify-content-between align-items-center">
 							<Zap size={16} className="me-2" />
 							<span>Generate Cards</span>
 						</div>
+						{generateLoading && (
+							<Spinner size="sm" animation="border" className="ms-2" />
+						)}
 					</Button>
 				</Col>
 			</Row>
@@ -511,8 +540,17 @@ const Flashcards = () => {
 												variant="outline-danger"
 												size="sm"
 												onClick={() => deleteDeck(deck._id)}
+												disabled={deleteDeckLoading === deck._id}
 											>
-												<Trash2 size={12} />
+												{deleteDeckLoading === deck._id ? (
+													<Spinner
+														size="sm"
+														animation="border"
+														className="me-1"
+													/>
+												) : (
+													<Trash2 size={12} />
+												)}
 											</Button>
 										</div>
 									</Card.Body>
@@ -528,11 +566,18 @@ const Flashcards = () => {
 					<p className="text-muted mb-4">
 						Generate your first set of flashcards from your notes using AI.
 					</p>
-					<Button variant="primary" onClick={() => setShowGenerateModal(true)}>
+					<Button
+						variant="primary"
+						onClick={() => setShowGenerateModal(true)}
+						disabled={generateLoading}
+					>
 						<div className="d-flex justify-content-between align-items-center">
 							<Zap size={16} className="me-2" />
 							<span>Generate Your First Deck</span>
 						</div>
+						{generateLoading && (
+							<Spinner size="sm" animation="border" className="ms-2" />
+						)}
 					</Button>
 				</div>
 			)}
@@ -576,15 +621,32 @@ const Flashcards = () => {
 												variant="outline-primary"
 												size="sm"
 												onClick={() => editCardHandler(card)}
+												disabled={updateCardLoading}
 											>
 												<Edit size={12} />
+												{updateCardLoading && (
+													<Spinner
+														size="sm"
+														animation="border"
+														className="ms-2"
+													/>
+												)}
 											</Button>
 											<Button
 												variant="outline-danger"
 												size="sm"
 												onClick={() => deleteCard(card._id)}
+												disabled={deleteCardLoading === card._id}
 											>
-												<Trash2 size={12} />
+												{deleteCardLoading === card._id ? (
+													<Spinner
+														size="sm"
+														animation="border"
+														className="ms-1"
+													/>
+												) : (
+													<Trash2 size={12} />
+												)}
 											</Button>
 										</div>
 									</Card.Body>
@@ -598,9 +660,10 @@ const Flashcards = () => {
 			{/* Generate Flashcards Modal */}
 			<Modal
 				show={showGenerateModal}
-				onHide={() => setShowGenerateModal(false)}
+				onHide={generateLoading ? undefined : () => setShowGenerateModal(false)}
+				backdrop={generateLoading ? "static" : true}
 			>
-				<Modal.Header closeButton>
+				<Modal.Header closeButton={!generateLoading}>
 					<Modal.Title>Generate Flashcards</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -616,6 +679,7 @@ const Flashcards = () => {
 									})
 								}
 								required
+								disabled={generateLoading}
 							>
 								<option value="">Choose a note...</option>
 								{notes.length > 0 &&
@@ -637,6 +701,7 @@ const Flashcards = () => {
 										numberOfCards: parseInt(e.target.value),
 									})
 								}
+								disabled={generateLoading}
 							>
 								<option value={5}>5 cards</option>
 								<option value={10}>10 cards</option>
@@ -655,6 +720,7 @@ const Flashcards = () => {
 										difficulty: e.target.value,
 									})
 								}
+								disabled={generateLoading}
 							>
 								<option value="easy">Easy</option>
 								<option value="medium">Medium</option>
@@ -672,6 +738,7 @@ const Flashcards = () => {
 										cardType: e.target.value,
 									})
 								}
+								disabled={generateLoading}
 							>
 								<option value="basic">Basic (Question/Answer)</option>
 								<option value="cloze">Cloze (Fill in the blank)</option>
@@ -684,18 +751,19 @@ const Flashcards = () => {
 					<Button
 						variant="secondary"
 						onClick={() => setShowGenerateModal(false)}
+						disabled={generateLoading}
 					>
 						Cancel
 					</Button>
 					<Button
 						variant="primary"
 						onClick={generateFlashcards}
-						disabled={!generateOptions.noteId}
+						disabled={generateLoading || !generateOptions.noteId}
 					>
-						<div className="d-flex justify-content-between align-items-center">
-							<Zap size={16} className="me-2" />
-							<span>Generate Cards</span>
-						</div>
+						{generateLoading ? (
+							<Spinner size="sm" animation="border" className="me-2" />
+						) : null}
+						Generate Cards
 					</Button>
 				</Modal.Footer>
 			</Modal>
@@ -704,8 +772,9 @@ const Flashcards = () => {
 			<Modal
 				show={showCreateDeckModal}
 				onHide={() => setShowCreateDeckModal(false)}
+				backdrop={createDeckLoading}
 			>
-				<Modal.Header closeButton>
+				<Modal.Header closeButton={!createDeckLoading}>
 					<Modal.Title>Create New Deck</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -719,6 +788,7 @@ const Flashcards = () => {
 									setNewDeck({ ...newDeck, name: e.target.value })
 								}
 								placeholder="Enter deck name"
+								disabled={createDeckLoading}
 							/>
 						</Form.Group>
 						<Form.Group className="mb-3">
@@ -731,6 +801,7 @@ const Flashcards = () => {
 									setNewDeck({ ...newDeck, description: e.target.value })
 								}
 								placeholder="Enter deck description"
+								disabled={createDeckLoading}
 							/>
 						</Form.Group>
 					</Form>
@@ -739,14 +810,22 @@ const Flashcards = () => {
 					<Button
 						variant="secondary"
 						onClick={() => setShowCreateDeckModal(false)}
+						disabled={createDeckLoading}
 					>
 						Cancel
 					</Button>
-					<Button variant="primary" onClick={createDeck}>
+					<Button
+						variant="primary"
+						onClick={createDeck}
+						disabled={createDeckLoading}
+					>
 						<div className="d-flex justify-content-between align-items-center">
 							<Plus size={16} className="me-2" />
 							<span>Create Deck</span>
 						</div>
+						{createDeckLoading && (
+							<Spinner size="sm" animation="border" className="ms-2" />
+						)}
 					</Button>
 				</Modal.Footer>
 			</Modal>
@@ -755,8 +834,9 @@ const Flashcards = () => {
 			<Modal
 				show={showEditCardModal}
 				onHide={() => setShowEditCardModal(false)}
+				backdrop={updateCardLoading}
 			>
-				<Modal.Header closeButton>
+				<Modal.Header closeButton={!updateCardLoading}>
 					<Modal.Title>Edit Card</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -771,6 +851,7 @@ const Flashcards = () => {
 									setEditCard({ ...editCard, frontContent: e.target.value })
 								}
 								placeholder="Enter front content"
+								disabled={updateCardLoading}
 							/>
 						</Form.Group>
 						<Form.Group className="mb-3">
@@ -783,6 +864,7 @@ const Flashcards = () => {
 									setEditCard({ ...editCard, backContent: e.target.value })
 								}
 								placeholder="Enter back content"
+								disabled={updateCardLoading}
 							/>
 						</Form.Group>
 						<Form.Group className="mb-3">
@@ -792,6 +874,7 @@ const Flashcards = () => {
 								onChange={(e) =>
 									setEditCard({ ...editCard, difficulty: e.target.value })
 								}
+								disabled={updateCardLoading}
 							>
 								<option value="easy">Easy</option>
 								<option value="medium">Medium</option>
@@ -804,14 +887,22 @@ const Flashcards = () => {
 					<Button
 						variant="secondary"
 						onClick={() => setShowEditCardModal(false)}
+						disabled={updateCardLoading}
 					>
 						Cancel
 					</Button>
-					<Button variant="primary" onClick={updateCard}>
+					<Button
+						variant="primary"
+						onClick={updateCard}
+						disabled={updateCardLoading}
+					>
 						<div className="d-flex justify-content-between align-items-center">
 							<Edit size={16} className="me-2" />
 							<span>Update Card</span>
 						</div>
+						{updateCardLoading && (
+							<Spinner size="sm" animation="border" className="ms-2" />
+						)}
 					</Button>
 				</Modal.Footer>
 			</Modal>

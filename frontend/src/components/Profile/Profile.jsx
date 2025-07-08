@@ -9,13 +9,19 @@ import {
 	Alert,
 	Tab,
 	Tabs,
+	Spinner,
 } from "react-bootstrap";
 import { useAuth } from "../../contexts/AuthContext";
 import { User, Lock, Settings, Bell } from "lucide-react";
 
 const Profile = () => {
-	const { user, updateProfile, changePassword } = useAuth();
-	const [loading, setLoading] = useState(false);
+	const {
+		user,
+		updateProfile,
+		changePassword,
+		profileLoading,
+		changePasswordLoading,
+	} = useAuth();
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState("");
 
@@ -40,7 +46,6 @@ const Profile = () => {
 
 	const handleProfileUpdate = async (e) => {
 		e.preventDefault();
-		setLoading(true);
 		setMessage("");
 		setError("");
 
@@ -51,19 +56,15 @@ const Profile = () => {
 		} else {
 			setError(result.message);
 		}
-
-		setLoading(false);
 	};
 
 	const handlePasswordChange = async (e) => {
 		e.preventDefault();
-		setLoading(true);
 		setMessage("");
 		setError("");
 
 		if (passwordData.newPassword !== passwordData.confirmPassword) {
 			setError("New passwords do not match");
-			setLoading(false);
 			return;
 		}
 
@@ -83,8 +84,6 @@ const Profile = () => {
 		} else {
 			setError(result.message);
 		}
-
-		setLoading(false);
 	};
 
 	const handlePreferencesUpdate = async (e) => {
@@ -189,13 +188,17 @@ const Profile = () => {
 											<Button
 												type="submit"
 												variant="primary"
-												disabled={loading}
+												disabled={profileLoading}
 												className="px-4"
 											>
-												{loading ? (
-													<span className="loading-spinner me-2"></span>
+												{profileLoading ? (
+													<Spinner
+														size="sm"
+														animation="border"
+														className="me-2"
+													/>
 												) : null}
-												{loading ? "Updating..." : "Update Profile"}
+												{profileLoading ? "Updating..." : "Update Profile"}
 											</Button>
 										</Form>
 									</div>
@@ -282,13 +285,19 @@ const Profile = () => {
 											<Button
 												type="submit"
 												variant="primary"
-												disabled={loading}
+												disabled={changePasswordLoading}
 												className="px-4"
 											>
-												{loading ? (
-													<span className="loading-spinner me-2"></span>
+												{changePasswordLoading ? (
+													<Spinner
+														size="sm"
+														animation="border"
+														className="me-2"
+													/>
 												) : null}
-												{loading ? "Changing..." : "Change Password"}
+												{changePasswordLoading
+													? "Changing..."
+													: "Change Password"}
 											</Button>
 										</Form>
 									</div>

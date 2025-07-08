@@ -10,6 +10,7 @@ import {
 	ProgressBar,
 	Alert,
 	Badge,
+	Spinner,
 } from "react-bootstrap";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -28,6 +29,7 @@ import {
 	Calendar,
 	TrendingUp,
 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 const Quiz = () => {
 	const [quizzes, setQuizzes] = useState([]);
@@ -51,7 +53,14 @@ const Quiz = () => {
 		quizType: "multiple_choice",
 		numberOfQuestions: 10,
 		timeLimit: 15,
+		language: "english",
+		customPrompt: "",
 	});
+	const [generateLoading, setGenerateLoading] = useState(false);
+	const [startQuizLoading, setStartQuizLoading] = useState(null); // quizId or null
+	const [deleteQuizLoading, setDeleteQuizLoading] = useState(null); // quizId or null
+
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		fetchData();
@@ -114,16 +123,31 @@ const Quiz = () => {
 
 	const generateQuiz = async () => {
 		try {
-			if (!generateOptions.sourceId) {
+			if (
+				generateOptions.source === "custom" &&
+				!generateOptions.customPrompt.trim()
+			) {
+				toast.error("Please enter your custom quiz requirement");
+				return;
+			}
+			if (
+				(generateOptions.source === "note" ||
+					generateOptions.source === "deck") &&
+				!generateOptions.sourceId
+			) {
 				toast.error("Please select a source");
 				return;
 			}
-
-			const response = await axios.post("/content/quizzes/generate", generateOptions, {
-				headers: {
-					Authorization: `Bearer ${localStorage.getItem("token")}`,
-				},
-			});
+			setGenerateLoading(true);
+			const response = await axios.post(
+				"/content/quizzes/generate",
+				generateOptions,
+				{
+					headers: {
+						Authorization: `Bearer ${localStorage.getItem("token")}`,
+					},
+				}
+			);
 
 			toast.success("Quiz generated successfully!");
 			fetchData();
@@ -134,15 +158,20 @@ const Quiz = () => {
 				quizType: "multiple_choice",
 				numberOfQuestions: 10,
 				timeLimit: 15,
+				language: "english",
+				customPrompt: "",
 			});
 		} catch (error) {
 			console.error("Generate quiz error:", error);
 			toast.error("Failed to generate quiz");
+		} finally {
+			setGenerateLoading(false);
 		}
 	};
 
 	const startQuiz = async (quiz) => {
 		try {
+			setStartQuizLoading(quiz._id);
 			// Start quiz session
 			const response = await axios.post(
 				`/content/quizzes/${quiz._id}/start`,
@@ -153,16 +182,13 @@ const Quiz = () => {
 					},
 				}
 			);
-
-			setCurrentQuiz(response.data);
-			setCurrentQuestionIndex(0);
-			setUserAnswers(new Array(quiz.questions?.length || 0).fill(""));
-			setTimeLeft(quiz.timeLimit * 60);
-			setQuizStartTime(new Date());
-			setShowQuizModal(true);
+			// Instead of opening modal, navigate to take page
+			navigate(`/quiz/${quiz._id}/take`);
 		} catch (error) {
 			console.error("Start quiz error:", error);
 			toast.error("Failed to start quiz");
+		} finally {
+			setStartQuizLoading(null);
 		}
 	};
 
@@ -217,6 +243,7 @@ const Quiz = () => {
 	const deleteQuiz = async (quizId) => {
 		if (window.confirm("Are you sure you want to delete this quiz?")) {
 			try {
+				setDeleteQuizLoading(quizId);
 				await axios.delete(`/content/quizzes/${quizId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -228,6 +255,8 @@ const Quiz = () => {
 			} catch (error) {
 				console.error("Delete quiz error:", error);
 				toast.error("Failed to delete quiz");
+			} finally {
+				setDeleteQuizLoading(null);
 			}
 		}
 	};
@@ -264,11 +293,16 @@ const Quiz = () => {
 						<span>{new Date(quiz.createdAt).toLocaleDateString()}</span>
 					</small>
 					<div className="btn-group">
-						<Button variant="primary" size="sm" onClick={() => startQuiz(quiz)}>
+						<Button
+							variant="primary"
+							size="sm"
+							onClick={() => startQuiz(quiz)}
+							disabled={startQuizLoading === quiz._id}
+						>
 							<div className="d-flex justify-content-between align-items-center">
 								<div className="d-flex justify-content-between align-items-center">
 									<Play size={12} className="me-1" />
-									<span>Start</span>
+									<span>{quiz.isCompleted ? "Retake" : "Start"}</span>
 								</div>
 							</div>
 						</Button>
@@ -276,8 +310,13 @@ const Quiz = () => {
 							variant="outline-danger"
 							size="sm"
 							onClick={() => deleteQuiz(quiz._id)}
+							disabled={deleteQuizLoading === quiz._id}
 						>
-							<Trash2 size={12} />
+							{deleteQuizLoading === quiz._id ? (
+								<Spinner size="sm" animation="border" className="me-1" />
+							) : (
+								<Trash2 size={12} />
+							)}
 						</Button>
 					</div>
 				</div>
@@ -488,26 +527,32 @@ const Quiz = () => {
 				</Row>
 			) : (
 				<div className="text-center py-5">
-					<BarChart3 size={64} className="text-muted mb-3" />
-					<h4 className="text-muted mb-2">No quizzes available</h4>
-					<p className="text-muted mb-4">
-						Generate your first quiz from your notes or flashcard decks.
-					</p>
-					<Button variant="primary" onClick={() => setShowGenerateModal(true)}>
-						<div className="d-flex justify-content-between align-items-center">
-							<Play size={16} className="me-2" />
-							<span>Generate Your First Quiz</span>
-						</div>
-					</Button>
+					<div className="d-flex flex-column align-items-center">
+						<BarChart3 size={64} className="text-muted mb-3" />
+						<h4 className="text-muted mb-2">No quizzes available</h4>
+						<p className="text-muted mb-4">
+							Generate your first quiz from your notes or flashcard decks.
+						</p>
+						<Button
+							variant="primary"
+							onClick={() => setShowGenerateModal(true)}
+						>
+							<div className="d-flex justify-content-between align-items-center">
+								<Play size={16} className="me-2" />
+								<span>Generate Your First Quiz</span>
+							</div>
+						</Button>
+					</div>
 				</div>
 			)}
 
 			{/* Generate Quiz Modal */}
 			<Modal
 				show={showGenerateModal}
-				onHide={() => setShowGenerateModal(false)}
+				onHide={generateLoading ? undefined : () => setShowGenerateModal(false)}
+				backdrop={generateLoading ? "static" : true}
 			>
-				<Modal.Header closeButton>
+				<Modal.Header closeButton={!generateLoading}>
 					<Modal.Title>Generate New Quiz</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -521,39 +566,58 @@ const Quiz = () => {
 										...generateOptions,
 										source: e.target.value,
 										sourceId: "",
+										customPrompt: "",
 									})
 								}
 							>
 								<option value="note">From Note</option>
 								<option value="deck">From Flashcard Deck</option>
+								<option value="custom">Custom</option>
 							</Form.Select>
 						</Form.Group>
-
-						<Form.Group className="mb-3">
-							<Form.Label>
-								Select {generateOptions.source === "note" ? "Note" : "Deck"}
-							</Form.Label>
-							<Form.Select
-								value={generateOptions.sourceId}
-								onChange={(e) =>
-									setGenerateOptions({
-										...generateOptions,
-										sourceId: e.target.value,
-									})
-								}
-								required
-							>
-								<option value="">Choose a {generateOptions.source}...</option>
-								{(generateOptions.source === "note" ? notes : decks).map(
-									(item) => (
-										<option key={item._id} value={item._id}>
-											{item.title || item.name}
-										</option>
-									)
-								)}
-							</Form.Select>
-						</Form.Group>
-
+						{generateOptions.source === "custom" ? (
+							<Form.Group className="mb-3">
+								<Form.Label>Custom Quiz Requirement</Form.Label>
+								<Form.Control
+									as="textarea"
+									rows={4}
+									value={generateOptions.customPrompt}
+									onChange={(e) =>
+										setGenerateOptions({
+											...generateOptions,
+											customPrompt: e.target.value,
+										})
+									}
+									placeholder="Describe your quiz requirement (e.g., 'Create a quiz about World War II with 10 questions')"
+									required
+								/>
+							</Form.Group>
+						) : (
+							<Form.Group className="mb-3">
+								<Form.Label>
+									Select {generateOptions.source === "note" ? "Note" : "Deck"}
+								</Form.Label>
+								<Form.Select
+									value={generateOptions.sourceId}
+									onChange={(e) =>
+										setGenerateOptions({
+											...generateOptions,
+											sourceId: e.target.value,
+										})
+									}
+									required
+								>
+									<option value="">Choose a {generateOptions.source}...</option>
+									{(generateOptions.source === "note" ? notes : decks).map(
+										(item) => (
+											<option key={item._id} value={item._id}>
+												{item.title || item.name}
+											</option>
+										)
+									)}
+								</Form.Select>
+							</Form.Group>
+						)}
 						<Form.Group className="mb-3">
 							<Form.Label>Quiz Type</Form.Label>
 							<Form.Select
@@ -587,6 +651,20 @@ const Quiz = () => {
 								<option value={10}>10 questions</option>
 								<option value={15}>15 questions</option>
 								<option value={20}>20 questions</option>
+								<option value={25}>25 questions</option>
+								<option value={30}>30 questions</option>
+								<option value={40}>40 questions</option>
+								<option value={50}>50 questions</option>
+								<option value={60}>60 questions</option>
+								<option value={70}>70 questions</option>
+								<option value={80}>80 questions</option>
+								<option value={90}>90 questions</option>
+								<option value={100}>100 questions</option>
+								<option value={110}>110 questions</option>
+								<option value={120}>120 questions</option>
+								<option value={130}>130 questions</option>
+								<option value={140}>140 questions</option>
+								<option value={150}>150 questions</option>
 							</Form.Select>
 						</Form.Group>
 
@@ -606,6 +684,27 @@ const Quiz = () => {
 								<option value={15}>15 minutes</option>
 								<option value={30}>30 minutes</option>
 								<option value={60}>60 minutes</option>
+								<option value={90}>90 minutes</option>
+								<option value={120}>120 minutes</option>
+								<option value={150}>150 minutes</option>
+								<option value={180}>180 minutes</option>
+								<option value={210}>210 minutes</option>
+								<option value={240}>240 minutes</option>
+							</Form.Select>
+						</Form.Group>
+						<Form.Group className="mb-3">
+							<Form.Label>Language</Form.Label>
+							<Form.Select
+								value={generateOptions.language}
+								onChange={(e) =>
+									setGenerateOptions({
+										...generateOptions,
+										language: e.target.value,
+									})
+								}
+							>
+								<option value="english">English</option>
+								<option value="hindi">Hindi</option>
 							</Form.Select>
 						</Form.Group>
 					</Form>
@@ -614,198 +713,27 @@ const Quiz = () => {
 					<Button
 						variant="secondary"
 						onClick={() => setShowGenerateModal(false)}
+						disabled={generateLoading}
 					>
 						Cancel
 					</Button>
 					<Button
 						variant="primary"
 						onClick={generateQuiz}
-						disabled={!generateOptions.sourceId}
+						disabled={
+							generateLoading ||
+							(generateOptions.source === "custom"
+								? !generateOptions.customPrompt.trim()
+								: !generateOptions.sourceId)
+						}
 					>
-						<div className="d-flex justify-content-between align-items-center">
-							<Play size={16} className="me-2" />
+						<div className="d-flex align-items-center">
+							{generateLoading ? (
+								<Spinner size="sm" animation="border" className="me-2" />
+							) : (
+								<Play size={16} className="me-2" />
+							)}
 							<span>Generate Quiz</span>
-						</div>
-					</Button>
-				</Modal.Footer>
-			</Modal>
-
-			{/* Quiz Taking Modal */}
-			<Modal show={showQuizModal} onHide={() => {}} size="lg" backdrop="static">
-				<Modal.Header>
-					<Modal.Title className="d-flex align-items-center">
-						<span className="me-3">{currentQuiz?.quiz?.title}</span>
-						<Badge bg={timeLeft < 60 ? "danger" : "primary"}>
-							<Clock size={12} className="me-1" />
-							{formatTime(timeLeft)}
-						</Badge>
-					</Modal.Title>
-				</Modal.Header>
-				<Modal.Body>
-					<div className="mb-4">
-						<ProgressBar
-							now={
-								((currentQuestionIndex + 1) /
-									(currentQuiz?.quiz?.questions?.length || 1)) *
-								100
-							}
-							className="mb-2"
-						/>
-						<div className="d-flex justify-content-between text-muted small">
-							<span>
-								Question {currentQuestionIndex + 1} of{" "}
-								{currentQuiz?.quiz?.questions?.length || 0}
-							</span>
-							<span>
-								{userAnswers.filter((answer) => answer !== "").length} answered
-							</span>
-						</div>
-					</div>
-
-					{currentQuestion && (
-						<QuestionComponent
-							question={currentQuestion}
-							questionIndex={currentQuestionIndex}
-							selectedAnswer={userAnswers[currentQuestionIndex]}
-							onAnswerSelect={handleAnswerSelect}
-						/>
-					)}
-				</Modal.Body>
-				<Modal.Footer>
-					<Button
-						variant="outline-secondary"
-						onClick={handlePreviousQuestion}
-						disabled={currentQuestionIndex === 0}
-					>
-						Previous
-					</Button>
-					<div className="flex-grow-1 text-center">
-						<small className="text-muted">
-							{userAnswers[currentQuestionIndex]
-								? "Answer selected"
-								: "Select an answer"}
-						</small>
-					</div>
-					<Button variant="primary" onClick={handleNextQuestion}>
-						{currentQuestionIndex ===
-						(currentQuiz?.quiz?.questions?.length || 1) - 1
-							? "Submit Quiz"
-							: "Next"}
-					</Button>
-				</Modal.Footer>
-			</Modal>
-
-			{/* Quiz Results Modal */}
-			<Modal
-				show={showResultsModal}
-				onHide={() => setShowResultsModal(false)}
-				size="lg"
-			>
-				<Modal.Header closeButton>
-					<Modal.Title>Quiz Results</Modal.Title>
-				</Modal.Header>
-				<Modal.Body>
-					{quizResults && (
-						<>
-							<div className="text-center mb-4">
-								<div
-									className={`rounded-circle p-4 mx-auto mb-3 d-inline-flex ${
-										quizResults.score >= 80
-											? "bg-success"
-											: quizResults.score >= 60
-											? "bg-warning"
-											: "bg-danger"
-									} bg-opacity-10`}
-								>
-									<Award
-										className={`${
-											quizResults.score >= 80
-												? "text-success"
-												: quizResults.score >= 60
-												? "text-warning"
-												: "text-danger"
-										}`}
-										size={48}
-									/>
-								</div>
-								<h2 className="fw-bold mb-2">{quizResults.score}%</h2>
-								<p className="text-muted mb-0">
-									You got {quizResults.correctAnswers} out of{" "}
-									{quizResults.totalQuestions} questions correct
-								</p>
-							</div>
-
-							<Row className="g-3 mb-4">
-								<Col md={4}>
-									<Card className="text-center border-0 bg-light">
-										<Card.Body>
-											<CheckCircle className="text-success mb-2" size={24} />
-											<h5 className="fw-bold">{quizResults.correctAnswers}</h5>
-											<small className="text-muted">Correct</small>
-										</Card.Body>
-									</Card>
-								</Col>
-								<Col md={4}>
-									<Card className="text-center border-0 bg-light">
-										<Card.Body>
-											<XCircle className="text-danger mb-2" size={24} />
-											<h5 className="fw-bold">
-												{quizResults.totalQuestions -
-													quizResults.correctAnswers}
-											</h5>
-											<small className="text-muted">Incorrect</small>
-										</Card.Body>
-									</Card>
-								</Col>
-								<Col md={4}>
-									<Card className="text-center border-0 bg-light">
-										<Card.Body>
-											<Clock className="text-info mb-2" size={24} />
-											<h5 className="fw-bold">
-												{formatTime(quizResults.timeTaken || 0)}
-											</h5>
-											<small className="text-muted">Time Taken</small>
-										</Card.Body>
-									</Card>
-								</Col>
-							</Row>
-
-							<Alert
-								variant={
-									quizResults.score >= 80
-										? "success"
-										: quizResults.score >= 60
-										? "warning"
-										: "danger"
-								}
-							>
-								<strong>
-									{quizResults.score >= 80
-										? "Excellent work!"
-										: quizResults.score >= 60
-										? "Good job!"
-										: "Keep studying!"}
-								</strong>
-								{quizResults.score >= 80
-									? " You have a strong understanding of the material."
-									: quizResults.score >= 60
-									? " You're on the right track. Review the incorrect answers."
-									: " Consider reviewing the material and trying again."}
-							</Alert>
-						</>
-					)}
-				</Modal.Body>
-				<Modal.Footer>
-					<Button
-						variant="secondary"
-						onClick={() => setShowResultsModal(false)}
-					>
-						Close
-					</Button>
-					<Button variant="primary" onClick={() => setShowResultsModal(false)}>
-						<div className="d-flex justify-content-between align-items-center">
-							<RefreshCw size={16} className="me-2" />
-							<span>Take Another Quiz</span>
 						</div>
 					</Button>
 				</Modal.Footer>
@@ -839,26 +767,45 @@ const Quiz = () => {
 											</p>
 											<small className="text-muted d-flex align-items-center">
 												<Calendar size={12} className="me-1" />
-												<span>{new Date(session.completedAt).toLocaleDateString()}</span>
+												<span>
+													{new Date(session.completedAt).toLocaleDateString()}
+												</span>
 											</small>
 										</div>
-										<Badge
-											bg={
-												session.score >= 80
-													? "success"
-													: session.score >= 60
-													? "warning"
-													: "danger"
-											}
-										>
-											{session.score}%
-										</Badge>
+										<div className="d-flex flex-column align-items-end">
+											<Badge
+												bg={
+													session.score >= 80
+														? "success"
+														: session.score >= 60
+														? "warning"
+														: "danger"
+												}
+												className="mb-2"
+											>
+												{session.score}%
+											</Badge>
+											<Button
+												size="sm"
+												variant="outline-primary"
+												onClick={() =>
+													navigate(
+														`/quiz/${session.quizId?._id}/results/${session._id}`,
+														{
+															state: { sessionId: session._id },
+														}
+													)
+												}
+											>
+												View Result
+											</Button>
+										</div>
 									</div>
 								</div>
 							))}
 						</div>
 					) : (
-						<div className="text-center py-4">
+						<div className="text-center py-4 d-flex flex-column align-items-center">
 							<BarChart3 size={48} className="text-muted mb-3" />
 							<h5 className="text-muted mb-2">No quiz history</h5>
 							<p className="text-muted">

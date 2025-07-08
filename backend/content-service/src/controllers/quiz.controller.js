@@ -14,23 +14,24 @@ const generateQuiz = async (req, res) => {
 			quizType = "multiple_choice",
 			numberOfQuestions = 10,
 			timeLimit = 15,
+			language = "english",
+			customPrompt = "",
 		} = req.body;
 		logger.info(
 			`Generating quiz from source: ${source}, sourceId: ${sourceId} for user: ${req.userId}`
 		);
 
-		if (!source || !sourceId) {
-			logger.warn(
-				`Quiz generation failed for user: ${req.userId}. Missing source type or ID.`
-			);
-			return res
-				.status(400)
-				.json({ message: "Source type and ID are required" });
-		}
-
 		let content = "";
 		let title = "";
 		if (source === "note") {
+			if (!sourceId) {
+				logger.warn(
+					`Quiz generation failed for user: ${req.userId}. Missing source ID.`
+				);
+				return res
+					.status(400)
+					.json({ message: "Source ID is required for note" });
+			}
 			const note = await Note.findOne({ _id: sourceId, userId: req.userId });
 			if (!note) {
 				logger.warn(`Note not found with id: ${sourceId} for quiz generation.`);
@@ -39,6 +40,14 @@ const generateQuiz = async (req, res) => {
 			content = note.content;
 			title = `Quiz: ${note.title}`;
 		} else if (source === "deck") {
+			if (!sourceId) {
+				logger.warn(
+					`Quiz generation failed for user: ${req.userId}. Missing source ID.`
+				);
+				return res
+					.status(400)
+					.json({ message: "Source ID is required for deck" });
+			}
 			const deck = await FlashcardDeck.findOne({
 				_id: sourceId,
 				userId: req.userId,
@@ -52,10 +61,20 @@ const generateQuiz = async (req, res) => {
 				.map((card) => `Q: ${card.frontContent}\nA: ${card.backContent}`)
 				.join("\n\n");
 			title = `Quiz: ${deck.name}`;
+		} else if (source === "custom") {
+			if (!customPrompt.trim()) {
+				logger.warn(`Custom prompt is required for custom quiz generation.`);
+				return res.status(400).json({ message: "Custom quiz requirement is required" });
+			}
+			content = customPrompt;
+			title = `Custom Quiz`;
+		} else {
+			logger.warn(`Invalid source type: ${source}`);
+			return res.status(400).json({ message: "Invalid source type" });
 		}
 
 		if (!content) {
-			logger.warn(`No content found for sourceId: ${sourceId}.`);
+			logger.warn(`No content found for quiz generation.`);
 			return res
 				.status(400)
 				.json({ message: "No content found to generate quiz from" });
@@ -64,6 +83,9 @@ const generateQuiz = async (req, res) => {
 		const aiQuestions = await aiClient.generateQuizFromAI(content, {
 			numberOfQuestions,
 			quizType,
+			language,
+			customPrompt,
+			source,
 		});
 
 		if (aiQuestions.length === 0) {
@@ -74,14 +96,14 @@ const generateQuiz = async (req, res) => {
 					quizType === "multiple_choice"
 						? ["Topic A", "Topic B", "Topic C", "Topic D"]
 						: quizType === "true_false"
-						? ["True", "False"]
-						: [],
+							? ["True", "False"]
+							: [],
 				correctAnswer:
 					quizType === "multiple_choice"
 						? "Topic A"
 						: quizType === "true_false"
-						? "True"
-						: "Main topic",
+							? "True"
+							: "Main topic",
 				explanation: "This question tests basic understanding of the content.",
 			});
 		}
@@ -90,11 +112,13 @@ const generateQuiz = async (req, res) => {
 			userId: req.userId,
 			title,
 			sourceType: source,
-			sourceId,
+			sourceId: source === "custom" ? undefined : sourceId,
 			quizType,
 			totalQuestions: aiQuestions.length,
 			questions: aiQuestions,
 			timeLimit,
+			language,
+			customPrompt: source === "custom" ? customPrompt : undefined,
 		});
 		await quiz.save();
 		logger.info(
@@ -164,6 +188,8 @@ const startQuizSession = async (req, res) => {
 			userId: req.userId,
 			quizId: quiz._id,
 			answers: [],
+			isCompleted: false,
+			quizTitle: quiz.title,
 			totalQuestions: quiz.questions.length,
 		});
 		await session.save();
@@ -180,7 +206,7 @@ const startQuizSession = async (req, res) => {
 
 const completeQuizSession = async (req, res) => {
 	try {
-		const { answers, sessionId } = req.body;
+		const { answers, sessionId, timeTaken } = req.body;
 		logger.info(
 			`Completing quiz session: ${sessionId} for quizId: ${req.params.id}`
 		);
@@ -209,22 +235,39 @@ const completeQuizSession = async (req, res) => {
 
 		let correctAnswers = 0;
 		const processedAnswers = quiz.questions.map((question, index) => {
-			const userAnswer = answers[index] || "";
+			const answerObj = answers?.find(a => a.questionIndex === index) || {};
+			const userAnswer = answerObj.userAnswer || "";
 			const isCorrect =
 				userAnswer.toLowerCase().trim() ===
 				question.correctAnswer.toLowerCase().trim();
 			if (isCorrect) correctAnswers++;
-			return { questionIndex: index, userAnswer, isCorrect, timeSpent: 0 };
+			return {
+				questionIndex: index,
+				userAnswer,
+				isCorrect,
+				timeSpent: typeof answerObj.timeSpent === "number" ? answerObj.timeSpent : 0,
+			};
 		});
 
 		const score = Math.round((correctAnswers / quiz.questions.length) * 100);
+		// Use provided timeTaken or sum of timeSpent
+		const totalTimeTaken = typeof timeTaken === "number"
+			? timeTaken
+			: processedAnswers.reduce((sum, a) => sum + (a.timeSpent || 0), 0);
+
+		const explanation = await aiClient.generateExplanationFromAI(quiz.questions, processedAnswers);
+
 		session.answers = processedAnswers;
 		session.score = score;
 		session.totalQuestions = quiz.questions.length;
 		session.correctAnswers = correctAnswers;
-		session.timeTaken = quiz.timeLimit * 60;
+		session.timeTaken = totalTimeTaken;
+		session.explanation = explanation;
 		session.completedAt = new Date();
+		session.isCompleted = true;
 		await session.save();
+		quiz.isCompleted = true;
+		await quiz.save();
 		logger.info(
 			`Quiz session completed successfully, sessionId: ${sessionId}, score: ${score}`
 		);
@@ -234,7 +277,7 @@ const completeQuizSession = async (req, res) => {
 			score,
 			correctAnswers,
 			totalQuestions: quiz.questions.length,
-			timeTaken: quiz.timeLimit * 60,
+			timeTaken: totalTimeTaken,
 		});
 	} catch (error) {
 		logger.error({
@@ -265,6 +308,29 @@ const getQuizResults = async (req, res) => {
 	} catch (error) {
 		logger.error({
 			message: `Error fetching quiz results for quizId: ${req.params.id}`,
+			error: error.message,
+		});
+		res.status(500).json({ message: "Server error fetching quiz results" });
+	}
+};
+
+const getQuizResultsBySessionId = async (req, res) => {
+	try {
+		const session = await QuizSession.findOne({
+			_id: req.params.sessionId,
+			quizId: req.params.id,
+			userId: req.userId,
+		});
+		if (!session) {
+			logger.warn(
+				`Quiz session not found for results, sessionId: ${req.params.sessionId}`
+			);
+			return res.status(404).json({ message: "Quiz session not found" });
+		}
+		res.json(session);
+	} catch (error) {
+		logger.error({
+			message: `Error fetching quiz results for sessionId: ${req.params.sessionId}`,
 			error: error.message,
 		});
 		res.status(500).json({ message: "Server error fetching quiz results" });
@@ -303,7 +369,7 @@ const deleteQuiz = async (req, res) => {
 const getSessionHistory = async (req, res) => {
 	try {
 		logger.info(`Fetching session history for user: ${req.userId}`);
-		const sessions = await QuizSession.find({ userId: req.userId })
+		const sessions = await QuizSession.find({ userId: req.userId, isCompleted: true })
 			.populate("quizId", "title")
 			.sort({ completedAt: -1 })
 			.limit(20);
@@ -320,6 +386,31 @@ const getSessionHistory = async (req, res) => {
 	}
 };
 
+const getQuizExplanation = async (req, res) => {
+	try {
+		const session = await QuizSession.findOne({
+			_id: req.params.sessionId,
+			quizId: req.params.id,
+			userId: req.userId,
+		});
+		if (!session) {
+			logger.warn(`Quiz session not found for explanation, sessionId: ${req.params.sessionId}`);
+			return res.status(404).json({ message: "Quiz session not found" });
+		}
+		if (!session.explanation) {
+			logger.warn(`No explanation found for sessionId: ${req.params.sessionId}`);
+			return res.status(404).json({ message: "No explanation found" });
+		}
+		res.json(session);
+	} catch (error) {
+		logger.error({
+			message: `Error fetching quiz explanation for sessionId: ${req.params.sessionId}`,
+			error: error.message,
+		});
+		res.status(500).json({ message: "Server error fetching quiz explanation" });
+	}
+};
+
 module.exports = {
 	generateQuiz,
 	getAllQuizzes,
@@ -329,4 +420,6 @@ module.exports = {
 	getQuizResults,
 	deleteQuiz,
 	getSessionHistory,
+	getQuizResultsBySessionId,
+	getQuizExplanation,
 };

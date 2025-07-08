@@ -20,11 +20,21 @@ const quizSessionSchema = new mongoose.Schema(
 				timeSpent: Number,
 			},
 		],
+		explanation: [
+			{
+				question: String,
+				correctAnswer: String,
+				incorrectAnswers: [String],
+				explanation: String,
+			},
+		],
+		quizTitle: String,
 		score: Number,
 		totalQuestions: Number,
 		correctAnswers: Number,
 		timeTaken: Number,
 		completedAt: Date,
+		isCompleted: { type: Boolean, default: false },
 	},
 	{ timestamps: true }
 );

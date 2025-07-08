@@ -12,6 +12,9 @@ import Notes from "./components/Notes/Notes";
 import Flashcards from "./components/Flashcards/Flashcards";
 import Quiz from "./components/Quiz/Quiz";
 import Profile from "./components/Profile/Profile";
+import QuizTakePage from "./components/Quiz/QuizTakePage";
+import QuizResultsPage from "./components/Quiz/QuizResultsPage";
+import QuizExplanationPage from "./components/Quiz/QuizExplanationPage";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
@@ -122,6 +125,30 @@ function App() {
 								element={
 									<ProtectedRoute>
 										<Quiz />
+									</ProtectedRoute>
+								}
+							/>
+							<Route
+								path="/quiz/:quizId/take"
+								element={
+									<ProtectedRoute>
+										<QuizTakePage />
+									</ProtectedRoute>
+								}
+							/>
+							<Route
+								path="/quiz/:quizId/results/:sessionId"
+								element={
+									<ProtectedRoute>
+										<QuizResultsPage />
+									</ProtectedRoute>
+								}
+							/>
+							<Route
+								path="/quiz/:quizId/explanation/:sessionId"
+								element={
+									<ProtectedRoute>
+										<QuizExplanationPage />
 									</ProtectedRoute>
 								}
 							/>

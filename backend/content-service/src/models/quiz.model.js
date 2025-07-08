@@ -8,8 +8,8 @@ const quizSchema = new mongoose.Schema(
 			required: true,
 		},
 		title: { type: String, required: true },
-		sourceType: { type: String, enum: ["note", "deck"], required: true },
-		sourceId: { type: mongoose.Schema.Types.ObjectId, required: true },
+		sourceType: { type: String, enum: ["note", "deck", "custom"], required: true },
+		sourceId: { type: mongoose.Schema.Types.ObjectId, required: false },
 		quizType: {
 			type: String,
 			enum: ["multiple_choice", "true_false", "fill_blank", "mixed"],
@@ -28,6 +28,7 @@ const quizSchema = new mongoose.Schema(
 			},
 		],
 		timeLimit: { type: Number, default: 15 },
+		isCompleted: { type: Boolean, default: false },
 	},
 	{ timestamps: true }
 );

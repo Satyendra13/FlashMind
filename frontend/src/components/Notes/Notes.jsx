@@ -61,6 +61,9 @@ const Notes = () => {
 		tags: [],
 	});
 	const [newTag, setNewTag] = useState("");
+	const [createLoading, setCreateLoading] = useState(false);
+	const [updateLoading, setUpdateLoading] = useState(false);
+	const [deleteLoading, setDeleteLoading] = useState(null); // noteId or null
 
 	useEffect(() => {
 		fetchNotes();
@@ -172,25 +175,21 @@ const Notes = () => {
 				toast.error("Title and content are required");
 				return;
 			}
-
+			setCreateLoading(true);
 			await axios.post("/content/notes/manual", newNote, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
 			});
-
 			toast.success("Note created successfully!");
 			fetchNotes();
 			setShowCreateModal(false);
-			setNewNote({
-				title: "",
-				content: "",
-				folder: "General",
-				tags: [],
-			});
+			setNewNote({ title: "", content: "", folder: "General", tags: [] });
 		} catch (error) {
 			console.error("Create note error:", error);
 			toast.error("Failed to create note");
+		} finally {
+			setCreateLoading(false);
 		}
 	};
 
@@ -200,36 +199,39 @@ const Notes = () => {
 				toast.error("Title and content are required");
 				return;
 			}
-
+			setUpdateLoading(true);
 			await axios.put(`/content/notes/${selectedNote._id}`, editNote, {
 				headers: {
 					Authorization: `Bearer ${localStorage.getItem("token")}`,
 				},
 			});
-
 			toast.success("Note updated successfully!");
 			fetchNotes();
 			setShowEditModal(false);
-			setSelectedNote(null);
 		} catch (error) {
 			console.error("Update note error:", error);
 			toast.error("Failed to update note");
+		} finally {
+			setUpdateLoading(false);
 		}
 	};
 
 	const deleteNote = async (noteId) => {
 		if (window.confirm("Are you sure you want to delete this note?")) {
 			try {
+				setDeleteLoading(noteId);
 				await axios.delete(`/content/notes/${noteId}`, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 				});
-				toast.success("Note deleted successfully");
+				toast.success("Note deleted successfully!");
 				fetchNotes();
 			} catch (error) {
 				console.error("Delete note error:", error);
 				toast.error("Failed to delete note");
+			} finally {
+				setDeleteLoading(null);
 			}
 		}
 	};
@@ -465,10 +467,11 @@ const Notes = () => {
 			{/* Create Note Modal */}
 			<Modal
 				show={showCreateModal}
-				onHide={() => setShowCreateModal(false)}
+				onHide={createLoading ? undefined : () => setShowCreateModal(false)}
+				backdrop={createLoading ? "static" : true}
 				size="lg"
 			>
-				<Modal.Header closeButton>
+				<Modal.Header closeButton={!createLoading}>
 					<Modal.Title>Create New Note</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -547,10 +550,21 @@ const Notes = () => {
 					</Form>
 				</Modal.Body>
 				<Modal.Footer>
-					<Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+					<Button
+						variant="secondary"
+						onClick={() => setShowCreateModal(false)}
+						disabled={createLoading}
+					>
 						Cancel
 					</Button>
-					<Button variant="primary" onClick={createNote}>
+					<Button
+						variant="primary"
+						onClick={createNote}
+						disabled={createLoading}
+					>
+						{createLoading ? (
+							<Spinner size="sm" animation="border" className="me-2" />
+						) : null}
 						Create Note
 					</Button>
 				</Modal.Footer>
@@ -645,6 +659,9 @@ const Notes = () => {
 						Cancel
 					</Button>
 					<Button variant="primary" onClick={updateNote}>
+						{updateLoading ? (
+							<Spinner size="sm" animation="border" className="me-2" />
+						) : null}
 						Update Note
 					</Button>
 				</Modal.Footer>

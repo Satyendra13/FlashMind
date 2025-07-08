@@ -21,6 +21,12 @@ export const AuthProvider = ({ children }) => {
 	const [user, setUser] = useState(null);
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const [loginLoading, setLoginLoading] = useState(false);
+	const [registerLoading, setRegisterLoading] = useState(false);
+	const [forgotLoading, setForgotLoading] = useState(false);
+	const [resetLoading, setResetLoading] = useState(false);
+	const [profileLoading, setProfileLoading] = useState(false);
+	const [changePasswordLoading, setChangePasswordLoading] = useState(false);
 
 	useEffect(() => {
 		checkAuthStatus();
@@ -46,6 +52,7 @@ export const AuthProvider = ({ children }) => {
 	};
 
 	const login = async (email, password, rememberMe = false) => {
+		setLoginLoading(true);
 		try {
 			const response = await axios.post("/auth/login", {
 				email,
@@ -67,10 +74,13 @@ export const AuthProvider = ({ children }) => {
 			const message = error.response?.data?.message || "Login failed";
 			toast.error(message);
 			return { success: false, message };
+		} finally {
+			setLoginLoading(false);
 		}
 	};
 
 	const register = async (userData) => {
+		setRegisterLoading(true);
 		try {
 			const response = await axios.post("/auth/register", userData);
 			toast.success(
@@ -81,6 +91,8 @@ export const AuthProvider = ({ children }) => {
 			const message = error.response?.data?.message || "Registration failed";
 			toast.error(message);
 			return { success: false, message };
+		} finally {
+			setRegisterLoading(false);
 		}
 	};
 
@@ -99,6 +111,7 @@ export const AuthProvider = ({ children }) => {
 	};
 
 	const forgotPassword = async (email) => {
+		setForgotLoading(true);
 		try {
 			await axios.post("/auth/forgot-password", { email });
 			toast.success("Password reset link sent to your email");
@@ -108,10 +121,13 @@ export const AuthProvider = ({ children }) => {
 				error.response?.data?.message || "Failed to send reset email";
 			toast.error(message);
 			return { success: false, message };
+		} finally {
+			setForgotLoading(false);
 		}
 	};
 
 	const resetPassword = async (token, newPassword, confirmPassword) => {
+		setResetLoading(true);
 		try {
 			await axios.post("/auth/reset-password", {
 				token,
@@ -126,6 +142,8 @@ export const AuthProvider = ({ children }) => {
 			const message = error.response?.data?.message || "Password reset failed";
 			toast.error(message);
 			return { success: false, message };
+		} finally {
+			setResetLoading(false);
 		}
 	};
 
@@ -143,6 +161,7 @@ export const AuthProvider = ({ children }) => {
 	};
 
 	const updateProfile = async (profileData) => {
+		setProfileLoading(true);
 		try {
 			const response = await axios.put("/auth/profile", profileData);
 			setUser(response.data.user);
@@ -152,6 +171,8 @@ export const AuthProvider = ({ children }) => {
 			const message = error.response?.data?.message || "Profile update failed";
 			toast.error(message);
 			return { success: false, message };
+		} finally {
+			setProfileLoading(false);
 		}
 	};
 
@@ -160,6 +181,7 @@ export const AuthProvider = ({ children }) => {
 		newPassword,
 		confirmPassword
 	) => {
+		setChangePasswordLoading(true);
 		try {
 			await axios.put("/auth/change-password", {
 				currentPassword,
@@ -172,6 +194,8 @@ export const AuthProvider = ({ children }) => {
 			const message = error.response?.data?.message || "Password change failed";
 			toast.error(message);
 			return { success: false, message };
+		} finally {
+			setChangePasswordLoading(false);
 		}
 	};
 
@@ -187,6 +211,12 @@ export const AuthProvider = ({ children }) => {
 		verifyEmail,
 		updateProfile,
 		changePassword,
+		loginLoading,
+		registerLoading,
+		forgotLoading,
+		resetLoading,
+		profileLoading,
+		changePasswordLoading,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

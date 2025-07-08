@@ -18,6 +18,16 @@ router.post(
 	quizController.completeQuizSession
 );
 router.get("/:id/results", authMiddleware, quizController.getQuizResults);
+router.get(
+	"/:id/results/:sessionId",
+	authMiddleware,
+	quizController.getQuizResultsBySessionId
+);
+router.get(
+	"/:id/explanation/:sessionId",
+	authMiddleware,
+	quizController.getQuizExplanation
+);
 router.delete("/:id", authMiddleware, quizController.deleteQuiz);
 
 module.exports = router;

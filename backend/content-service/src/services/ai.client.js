@@ -37,7 +37,24 @@ const generateFlashcardsFromAI = async (content, options) => {
 	}
 };
 
+const generateExplanationFromAI = async (questions, answers) => {
+	try {
+		logger.info("Sending request to AI service to generate explanation.");
+		const response = await apiClient.post("/quiz/explanation", { questions, answers });
+		logger.info("Received explanation from AI service.");
+		console.log(response.data, "explanation")
+		return response.data.explanation || [];
+	} catch (error) {
+		logger.error({
+			message: "Error calling AI service for explanation generation",
+			error: error.message,
+		});
+		return [];
+	}
+};
+
 module.exports = {
 	generateQuizFromAI,
 	generateFlashcardsFromAI,
+	generateExplanationFromAI,
 };
