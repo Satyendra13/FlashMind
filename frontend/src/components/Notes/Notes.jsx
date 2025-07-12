@@ -402,21 +402,26 @@ const Notes = () => {
 				)
 			) : (
 				<div className="text-center py-5">
-					<FileText size={64} className="text-muted mb-3" />
-					<h4 className="text-muted mb-2">No notes found</h4>
-					<p className="text-muted mb-4">
-						{searchTerm || selectedFolder !== "all"
-							? "Try adjusting your search or filter criteria."
-							: "Start by uploading your first document or creating a new note."}
-					</p>
-					{!searchTerm && selectedFolder === "all" && (
-						<Button variant="primary" onClick={() => setShowUploadModal(true)}>
-							<div className="d-flex justify-content-between align-items-center">
-								<Upload size={16} className="me-2" />
-								<span>Upload Your First Note</span>
-							</div>
-						</Button>
-					)}
+					<div className="d-flex flex-column align-items-center">
+						<FileText size={64} className="text-muted mb-3" />
+						<h4 className="text-muted mb-2">No notes found</h4>
+						<p className="text-muted mb-4">
+							{searchTerm || selectedFolder !== "all"
+								? "Try adjusting your search or filter criteria."
+								: "Start by uploading your first document or creating a new note."}
+						</p>
+						{!searchTerm && selectedFolder === "all" && (
+							<Button
+								variant="primary"
+								onClick={() => setShowUploadModal(true)}
+							>
+								<div className="d-flex justify-content-between align-items-center">
+									<Upload size={16} className="me-2" />
+									<span>Upload Your First Note</span>
+								</div>
+							</Button>
+						)}
+					</div>
 				</div>
 			)}
 

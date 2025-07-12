@@ -66,8 +66,12 @@ const generateQuiz = async (req, res) => {
 				logger.warn(`Custom prompt is required for custom quiz generation.`);
 				return res.status(400).json({ message: "Custom quiz requirement is required" });
 			}
+			if (!req.body.title || !req.body.title.trim()) {
+				logger.warn(`Custom quiz title is required for custom quiz generation.`);
+				return res.status(400).json({ message: "Custom quiz title is required" });
+			}
 			content = customPrompt;
-			title = `Custom Quiz`;
+			title = req.body.title.trim();
 		} else {
 			logger.warn(`Invalid source type: ${source}`);
 			return res.status(400).json({ message: "Invalid source type" });

@@ -9,6 +9,7 @@ router.post(
 	flashcardsController.generateFlashcards
 );
 router.get("/decks", authMiddleware, flashcardsController.getDecks);
+router.get("/deck/:id", authMiddleware, flashcardsController.getDeckById);
 router.post("/deck", authMiddleware, flashcardsController.createDeck);
 router.delete("/deck/:id", authMiddleware, flashcardsController.deleteDeck);
 router.get("/", authMiddleware, flashcardsController.getAllFlashcards);

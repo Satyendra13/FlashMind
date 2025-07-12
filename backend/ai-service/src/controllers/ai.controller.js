@@ -63,20 +63,27 @@ const generateFlashcards = async (req, res) => {
 	const { content, options } = req.body;
 	logger.info({ message: "Received request to generate flashcards", options });
 
-	const prompt = `
-    Create ${options.numberOfCards} flashcards from the following content.
-    Difficulty: ${options.difficulty}
-    Card Type: ${options.cardType}
-    Content: ${content}
-    Please return a JSON array where each flashcard has the following structure:
+	let prompt = "";
+	if (options.customPrompt) {
+		prompt += `Create ${options.numberOfCards} flashcards based on the following custom requirement.\nCustom Requirement: ${options.customPrompt}\n`;
+	} else {
+		prompt += `Create ${options.numberOfCards} flashcards from the following content.\nContent: ${content}\n`;
+	}
+	prompt += `Difficulty: ${options.difficulty}\n`;
+	prompt += `Card Type: ${options.cardType}\n`;
+	if (options.language && options.language.toLowerCase() === "hindi") {
+		prompt += `Generate the flashcards in Hindi.\n`;
+	} else {
+		prompt += `Generate the flashcards in English.\n`;
+	}
+	prompt += `Please return a JSON array where each flashcard has the following structure:
     {
       "frontContent": "Question or prompt",
       "backContent": "Answer or explanation",
       "difficulty": "${options.difficulty}"
     }
     Make sure the flashcards are educational, clear, and appropriate for the difficulty level.
-    Return only the JSON array, no additional text.
-  `;
+    Return only the JSON array, no additional text.`;
 
 	try {
 		const flashcards = await geminiService.generateContent(prompt);

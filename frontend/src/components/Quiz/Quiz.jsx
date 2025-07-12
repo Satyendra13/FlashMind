@@ -55,6 +55,7 @@ const Quiz = () => {
 		timeLimit: 15,
 		language: "english",
 		customPrompt: "",
+		title: "",
 	});
 	const [generateLoading, setGenerateLoading] = useState(false);
 	const [startQuizLoading, setStartQuizLoading] = useState(null); // quizId or null
@@ -125,9 +126,9 @@ const Quiz = () => {
 		try {
 			if (
 				generateOptions.source === "custom" &&
-				!generateOptions.customPrompt.trim()
+				(!generateOptions.customPrompt.trim() || !generateOptions.title?.trim())
 			) {
-				toast.error("Please enter your custom quiz requirement");
+				toast.error("Please enter your custom quiz requirement and title");
 				return;
 			}
 			if (
@@ -160,6 +161,7 @@ const Quiz = () => {
 				timeLimit: 15,
 				language: "english",
 				customPrompt: "",
+				title: "",
 			});
 		} catch (error) {
 			console.error("Generate quiz error:", error);
@@ -567,6 +569,7 @@ const Quiz = () => {
 										source: e.target.value,
 										sourceId: "",
 										customPrompt: "",
+										title: "",
 									})
 								}
 							>
@@ -576,22 +579,39 @@ const Quiz = () => {
 							</Form.Select>
 						</Form.Group>
 						{generateOptions.source === "custom" ? (
-							<Form.Group className="mb-3">
-								<Form.Label>Custom Quiz Requirement</Form.Label>
-								<Form.Control
-									as="textarea"
-									rows={4}
-									value={generateOptions.customPrompt}
-									onChange={(e) =>
-										setGenerateOptions({
-											...generateOptions,
-											customPrompt: e.target.value,
-										})
-									}
-									placeholder="Describe your quiz requirement (e.g., 'Create a quiz about World War II with 10 questions')"
-									required
-								/>
-							</Form.Group>
+							<>
+								<Form.Group className="mb-3">
+									<Form.Label>Quiz Title</Form.Label>
+									<Form.Control
+										type="text"
+										value={generateOptions.title || ""}
+										onChange={(e) =>
+											setGenerateOptions({
+												...generateOptions,
+												title: e.target.value,
+											})
+										}
+										placeholder="Enter quiz title (e.g., 'World War II Quiz')"
+										required
+									/>
+								</Form.Group>
+								<Form.Group className="mb-3">
+									<Form.Label>Custom Quiz Requirement</Form.Label>
+									<Form.Control
+										as="textarea"
+										rows={4}
+										value={generateOptions.customPrompt}
+										onChange={(e) =>
+											setGenerateOptions({
+												...generateOptions,
+												customPrompt: e.target.value,
+											})
+										}
+										placeholder="Describe your quiz requirement (e.g., 'Create a quiz about World War II')"
+										required
+									/>
+								</Form.Group>
+							</>
 						) : (
 							<Form.Group className="mb-3">
 								<Form.Label>
@@ -723,7 +743,8 @@ const Quiz = () => {
 						disabled={
 							generateLoading ||
 							(generateOptions.source === "custom"
-								? !generateOptions.customPrompt.trim()
+								? !generateOptions.customPrompt.trim() ||
+								  !generateOptions.title?.trim()
 								: !generateOptions.sourceId)
 						}
 					>

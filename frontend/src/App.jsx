@@ -2,6 +2,7 @@ import React from "react";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Navbar from "./components/Layout/Navbar";
+import Home from "./components/Home/Home";
 import Login from "./components/Auth/Login";
 import Register from "./components/Auth/Register";
 import ForgotPassword from "./components/Auth/ForgotPassword";
@@ -10,6 +11,7 @@ import EmailVerification from "./components/Auth/EmailVerification";
 import Dashboard from "./components/Dashboard/Dashboard";
 import Notes from "./components/Notes/Notes";
 import Flashcards from "./components/Flashcards/Flashcards";
+import StudyPage from "./components/Flashcards/StudyPage";
 import Quiz from "./components/Quiz/Quiz";
 import Profile from "./components/Profile/Profile";
 import QuizTakePage from "./components/Quiz/QuizTakePage";
@@ -51,119 +53,145 @@ function PublicRoute({ children }) {
 	return !isAuthenticated ? children : <Navigate to="/dashboard" />;
 }
 
+function AppContent() {
+	const { isAuthenticated, loading } = useAuth();
+
+	if (loading) {
+		return (
+			<div className="d-flex justify-content-center align-items-center min-vh-100">
+				<div className="spinner-border text-primary" role="status">
+					<span className="visually-hidden">Loading...</span>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="App">
+			{isAuthenticated && <Navbar />}
+			<main>
+				<Routes>
+					<Route
+						path="/"
+						element={isAuthenticated ? <Navigate to="/dashboard" /> : <Home />}
+					/>
+					<Route
+						path="/login"
+						element={
+							<PublicRoute>
+								<Login />
+							</PublicRoute>
+						}
+					/>
+					<Route
+						path="/register"
+						element={
+							<PublicRoute>
+								<Register />
+							</PublicRoute>
+						}
+					/>
+					<Route
+						path="/forgot-password"
+						element={
+							<PublicRoute>
+								<ForgotPassword />
+							</PublicRoute>
+						}
+					/>
+					<Route
+						path="/reset-password/:token"
+						element={
+							<PublicRoute>
+								<ResetPassword />
+							</PublicRoute>
+						}
+					/>
+					<Route path="/verify-email/:token" element={<EmailVerification />} />
+					<Route
+						path="/dashboard"
+						element={
+							<ProtectedRoute>
+								<Dashboard />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/notes"
+						element={
+							<ProtectedRoute>
+								<Notes />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/flashcards"
+						element={
+							<ProtectedRoute>
+								<Flashcards />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/flashcards/study/:id"
+						element={
+							<ProtectedRoute>
+								<StudyPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/quiz"
+						element={
+							<ProtectedRoute>
+								<Quiz />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/quiz/:quizId/take"
+						element={
+							<ProtectedRoute>
+								<QuizTakePage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/quiz/:quizId/results/:sessionId"
+						element={
+							<ProtectedRoute>
+								<QuizResultsPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/quiz/:quizId/explanation/:sessionId"
+						element={
+							<ProtectedRoute>
+								<QuizExplanationPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/profile"
+						element={
+							<ProtectedRoute>
+								<Profile />
+							</ProtectedRoute>
+						}
+					/>
+				</Routes>
+			</main>
+			<Toaster position="top-right" />
+		</div>
+	);
+}
+
 function App() {
 	return (
 		<AuthProvider>
 			<BrowserRouter>
-				<div className="App">
-					<Navbar />
-					<main>
-						<Routes>
-							<Route path="/" element={<Navigate to="/dashboard" />} />
-							<Route
-								path="/login"
-								element={
-									<PublicRoute>
-										<Login />
-									</PublicRoute>
-								}
-							/>
-							<Route
-								path="/register"
-								element={
-									<PublicRoute>
-										<Register />
-									</PublicRoute>
-								}
-							/>
-							<Route
-								path="/forgot-password"
-								element={
-									<PublicRoute>
-										<ForgotPassword />
-									</PublicRoute>
-								}
-							/>
-							<Route
-								path="/reset-password/:token"
-								element={
-									<PublicRoute>
-										<ResetPassword />
-									</PublicRoute>
-								}
-							/>
-							<Route
-								path="/verify-email/:token"
-								element={<EmailVerification />}
-							/>
-							<Route
-								path="/dashboard"
-								element={
-									<ProtectedRoute>
-										<Dashboard />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/notes"
-								element={
-									<ProtectedRoute>
-										<Notes />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/flashcards"
-								element={
-									<ProtectedRoute>
-										<Flashcards />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/quiz"
-								element={
-									<ProtectedRoute>
-										<Quiz />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/quiz/:quizId/take"
-								element={
-									<ProtectedRoute>
-										<QuizTakePage />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/quiz/:quizId/results/:sessionId"
-								element={
-									<ProtectedRoute>
-										<QuizResultsPage />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/quiz/:quizId/explanation/:sessionId"
-								element={
-									<ProtectedRoute>
-										<QuizExplanationPage />
-									</ProtectedRoute>
-								}
-							/>
-							<Route
-								path="/profile"
-								element={
-									<ProtectedRoute>
-										<Profile />
-									</ProtectedRoute>
-								}
-							/>
-						</Routes>
-					</main>
-					<Toaster position="top-right" />
-				</div>
+				<AppContent />
 			</BrowserRouter>
 		</AuthProvider>
 	);

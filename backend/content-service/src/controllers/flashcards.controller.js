@@ -7,40 +7,68 @@ const logger = require("../utils/logger");
 const generateFlashcards = async (req, res) => {
 	try {
 		const {
-			noteId,
+			source = "note",
+			sourceId,
+			title,
 			numberOfCards = 10,
 			difficulty = "medium",
 			cardType = "basic",
+			language = "english",
+			customPrompt,
 		} = req.body;
 		logger.info(
-			`Generating flashcards from noteId: ${noteId} for user: ${req.userId}`
+			`Generating flashcards for user: ${req.userId}, source: ${source}`
 		);
 
-		if (!noteId) {
-			logger.warn(
-				`Flashcard generation failed for user: ${req.userId}. Note ID is required.`
-			);
-			return res.status(400).json({ message: "Note ID is required" });
-		}
+		let content = "";
+		let deckName = "";
+		let deckDescription = "";
+		let deckTags = [];
 
-		const note = await Note.findOne({ _id: noteId, userId: req.userId });
-		if (!note) {
-			logger.warn(
-				`Note not found with id: ${noteId} for flashcard generation.`
-			);
-			return res.status(404).json({ message: "Note not found" });
+		if (source === "custom") {
+			if (!customPrompt?.trim() || !title?.trim()) {
+				logger.warn(
+					`Custom flashcard generation failed for user: ${req.userId}. Title and custom prompt are required.`
+				);
+				return res.status(400).json({
+					message: "Title and custom prompt are required for custom flashcards"
+				});
+			}
+			content = customPrompt;
+			deckName = title;
+			deckDescription = `AI-generated flashcards from custom requirements`;
+			deckTags = ["custom"];
+		} else {
+			if (!sourceId) {
+				logger.warn(
+					`Flashcard generation failed for user: ${req.userId}. Note ID is required.`
+				);
+				return res.status(400).json({ message: "Note ID is required" });
+			}
+
+			const note = await Note.findOne({ _id: sourceId, userId: req.userId });
+			if (!note) {
+				logger.warn(
+					`Note not found with id: ${sourceId} for flashcard generation.`
+				);
+				return res.status(404).json({ message: "Note not found" });
+			}
+			content = note.content;
+			deckName = `${note.title} - Flashcards`;
+			deckDescription = `AI-generated flashcards from ${note.title}`;
+			deckTags = [note.folder];
 		}
 
 		let deck = await FlashcardDeck.findOne({
 			userId: req.userId,
-			name: `${note.title} - Flashcards`,
+			name: deckName,
 		});
 		if (!deck) {
 			deck = new FlashcardDeck({
 				userId: req.userId,
-				name: `${note.title} - Flashcards`,
-				description: `AI-generated flashcards from ${note.title}`,
-				tags: [note.folder],
+				name: deckName,
+				description: deckDescription,
+				tags: deckTags,
 			});
 			await deck.save();
 			logger.info(
@@ -48,17 +76,19 @@ const generateFlashcards = async (req, res) => {
 			);
 		}
 
-		const aiFlashcards = await aiClient.generateFlashcardsFromAI(note.content, {
+		const aiFlashcards = await aiClient.generateFlashcardsFromAI(content, {
 			numberOfCards,
 			difficulty,
 			cardType,
+			language,
+			customPrompt: source === "custom" ? customPrompt : undefined,
 		});
 
 		if (aiFlashcards.length === 0) {
 			logger.warn("AI service returned 0 flashcards. Creating a fallback.");
 			aiFlashcards.push({
-				frontContent: `What is the main topic of "${note.title}"?`,
-				backContent: note.content.substring(0, 200) + "...",
+				frontContent: `What is the main topic of "${deckName}"?`,
+				backContent: content.substring(0, 200) + "...",
 				difficulty: difficulty,
 			});
 		}
@@ -67,7 +97,7 @@ const generateFlashcards = async (req, res) => {
 			(aiCard) =>
 				new Flashcard({
 					userId: req.userId,
-					noteId,
+					noteId: source === "note" ? sourceId : null,
 					deckId: deck._id,
 					frontContent: aiCard.frontContent,
 					backContent: aiCard.backContent,
@@ -114,6 +144,32 @@ const getDecks = async (req, res) => {
 			error: error.message,
 		});
 		res.status(500).json({ message: "Server error fetching decks" });
+	}
+};
+
+const getDeckById = async (req, res) => {
+	try {
+		logger.info(
+			`Fetching deck with id: ${req.params.id} for user: ${req.userId}`
+		);
+		const deck = await FlashcardDeck.findOne({
+			_id: req.params.id,
+			userId: req.userId,
+		});
+		if (!deck) {
+			logger.warn(
+				`Deck not found with id: ${req.params.id} for user: ${req.userId}`
+			);
+			return res.status(404).json({ message: "Deck not found" });
+		}
+		logger.info(`Successfully fetched deck with id: ${req.params.id}`);
+		res.json(deck);
+	} catch (error) {
+		logger.error({
+			message: `Error fetching deck with id: ${req.params.id}`,
+			error: error.message,
+		});
+		res.status(500).json({ message: "Server error fetching deck" });
 	}
 };
 
@@ -327,6 +383,7 @@ const deleteDeck = async (req, res) => {
 module.exports = {
 	generateFlashcards,
 	getDecks,
+	getDeckById,
 	getAllFlashcards,
 	getFlashcardById,
 	updateFlashcard,

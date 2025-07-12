@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
 	Container,
 	Row,
@@ -8,8 +9,6 @@ import {
 	Form,
 	Modal,
 	Badge,
-	ProgressBar,
-	Alert,
 	Spinner,
 } from "react-bootstrap";
 import axios from "axios";
@@ -20,41 +19,31 @@ import {
 	Play,
 	Edit,
 	Trash2,
-	RefreshCw,
 	BookOpen,
 	Zap,
 	Target,
 	Award,
-	Clock,
-	CheckCircle,
-	XCircle,
-	RotateCcw,
 } from "lucide-react";
 
 const Flashcards = () => {
+	const navigate = useNavigate();
 	const [flashcards, setFlashcards] = useState([]);
 	const [decks, setDecks] = useState([]);
 	const [notes, setNotes] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [showGenerateModal, setShowGenerateModal] = useState(false);
-	const [showStudyModal, setShowStudyModal] = useState(false);
 	const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
 	const [showEditCardModal, setShowEditCardModal] = useState(false);
-	const [currentDeck, setCurrentDeck] = useState(null);
-	const [currentCardIndex, setCurrentCardIndex] = useState(0);
-	const [flippedCard, setFlippedCard] = useState(false);
 	const [selectedCard, setSelectedCard] = useState(null);
-	const [studySession, setStudySession] = useState({
-		totalCards: 0,
-		completedCards: 0,
-		correctAnswers: 0,
-		startTime: null,
-	});
 	const [generateOptions, setGenerateOptions] = useState({
-		noteId: "",
+		source: "note",
+		sourceId: "",
+		title: "",
 		numberOfCards: 10,
 		difficulty: "medium",
 		cardType: "basic",
+		language: "english",
+		customPrompt: "",
 	});
 	const [newDeck, setNewDeck] = useState({
 		name: "",
@@ -109,7 +98,17 @@ const Flashcards = () => {
 
 	const generateFlashcards = async () => {
 		try {
-			if (!generateOptions.noteId) {
+			if (generateOptions.source === "custom") {
+				if (
+					!generateOptions.customPrompt.trim() ||
+					!generateOptions.title?.trim()
+				) {
+					toast.error(
+						"Please provide both title and custom prompt for custom flashcards"
+					);
+					return;
+				}
+			} else if (!generateOptions.sourceId) {
 				toast.error("Please select a note");
 				return;
 			}
@@ -128,10 +127,14 @@ const Flashcards = () => {
 			fetchData();
 			setShowGenerateModal(false);
 			setGenerateOptions({
-				noteId: "",
+				source: "note",
+				sourceId: "",
+				title: "",
 				numberOfCards: 10,
 				difficulty: "medium",
 				cardType: "basic",
+				language: "english",
+				customPrompt: "",
 			});
 		} catch (error) {
 			console.error("Generate flashcards error:", error);
@@ -204,65 +207,8 @@ const Flashcards = () => {
 			return;
 		}
 
-		setCurrentDeck(deck);
-		setCurrentCardIndex(0);
-		setFlippedCard(false);
-		setStudySession({
-			totalCards: deckCards.length,
-			completedCards: 0,
-			correctAnswers: 0,
-			startTime: new Date(),
-		});
-		setShowStudyModal(true);
-	};
-
-	const handleCardResponse = async (isCorrect) => {
-		const deckCards = flashcards.filter(
-			(card) => card.deckId?._id === currentDeck._id
-		);
-		const currentCard = deckCards[currentCardIndex];
-
-		// Record the review
-		try {
-			await axios.post(
-				`/content/flashcards/${currentCard._id}/review`,
-				{
-					isCorrect,
-				},
-				{
-					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
-					},
-				}
-			);
-		} catch (error) {
-			console.error("Error recording review:", error);
-		}
-
-		setStudySession((prev) => ({
-			...prev,
-			completedCards: prev.completedCards + 1,
-			correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
-		}));
-
-		if (currentCardIndex < deckCards.length - 1) {
-			setCurrentCardIndex(currentCardIndex + 1);
-			setFlippedCard(false);
-		} else {
-			const accuracy = Math.round(
-				((studySession.correctAnswers + (isCorrect ? 1 : 0)) /
-					deckCards.length) *
-					100
-			);
-			const timeSpent = Math.round(
-				(new Date() - studySession.startTime) / 1000 / 60
-			);
-			toast.success(
-				`Study session complete! Accuracy: ${accuracy}% in ${timeSpent} minutes`
-			);
-			setShowStudyModal(false);
-			fetchData(); // Refresh to get updated review data
-		}
+		// Navigate to the dedicated study page using React Router
+		navigate(`/flashcards/study/${deck._id}`);
 	};
 
 	const editCardHandler = (card) => {
@@ -321,33 +267,6 @@ const Flashcards = () => {
 		}
 	};
 
-	const FlashcardComponent = ({ card, flipped, onFlip }) => (
-		<div className={`flashcard ${flipped ? "flipped" : ""}`} onClick={onFlip}>
-			<div className="flashcard-inner">
-				<div className="flashcard-front">
-					<div className="d-flex justify-content-between align-items-start mb-3">
-						<Badge bg="primary">Front</Badge>
-						<DifficultyBadge difficulty={card.difficulty} />
-					</div>
-					<div className="d-flex align-items-center justify-content-center h-100">
-						<h5 className="mb-0 text-center">{card.frontContent}</h5>
-					</div>
-				</div>
-				<div className="flashcard-back">
-					<div className="d-flex justify-content-between align-items-start mb-3">
-						<Badge bg="light" text="dark">
-							Back
-						</Badge>
-						<small className="text-light">Click to flip</small>
-					</div>
-					<div className="d-flex align-items-center justify-content-center h-100">
-						<h5 className="mb-0 text-center">{card.backContent}</h5>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-
 	const DifficultyBadge = ({ difficulty }) => {
 		const colors = {
 			easy: "success",
@@ -366,11 +285,6 @@ const Flashcards = () => {
 			</div>
 		);
 	}
-
-	const deckCards = currentDeck
-		? flashcards.filter((card) => card.deckId?._id === currentDeck._id)
-		: [];
-	const currentCard = deckCards[currentCardIndex];
 
 	// Calculate statistics
 	const totalCards = flashcards.length;
@@ -561,24 +475,26 @@ const Flashcards = () => {
 				</Row>
 			) : (
 				<div className="text-center py-5">
-					<Brain size={64} className="text-muted mb-3" />
-					<h4 className="text-muted mb-2">No flashcard decks yet</h4>
-					<p className="text-muted mb-4">
-						Generate your first set of flashcards from your notes using AI.
-					</p>
-					<Button
-						variant="primary"
-						onClick={() => setShowGenerateModal(true)}
-						disabled={generateLoading}
-					>
-						<div className="d-flex justify-content-between align-items-center">
-							<Zap size={16} className="me-2" />
-							<span>Generate Your First Deck</span>
-						</div>
-						{generateLoading && (
-							<Spinner size="sm" animation="border" className="ms-2" />
-						)}
-					</Button>
+					<div className="d-flex flex-column align-items-center">
+						<Brain size={64} className="text-muted mb-3" />
+						<h4 className="text-muted mb-2">No flashcard decks yet</h4>
+						<p className="text-muted mb-4">
+							Generate your first set of flashcards from your notes using AI.
+						</p>
+						<Button
+							variant="primary"
+							onClick={() => setShowGenerateModal(true)}
+							disabled={generateLoading}
+						>
+							<div className="d-flex justify-content-between align-items-center">
+								<Zap size={16} className="me-2" />
+								<span>Generate Your First Deck</span>
+							</div>
+							{generateLoading && (
+								<Spinner size="sm" animation="border" className="ms-2" />
+							)}
+						</Button>
+					</div>
 				</div>
 			)}
 
@@ -669,25 +585,101 @@ const Flashcards = () => {
 				<Modal.Body>
 					<Form>
 						<Form.Group className="mb-3">
-							<Form.Label>Select Note</Form.Label>
+							<Form.Label>Source Type</Form.Label>
 							<Form.Select
-								value={generateOptions.noteId}
+								value={generateOptions.source}
 								onChange={(e) =>
 									setGenerateOptions({
 										...generateOptions,
-										noteId: e.target.value,
+										source: e.target.value,
+										sourceId: "",
+										title: "",
+										customPrompt: "",
 									})
 								}
-								required
 								disabled={generateLoading}
 							>
-								<option value="">Choose a note...</option>
-								{notes.length > 0 &&
-									notes.map((note) => (
-										<option key={note._id} value={note._id}>
-											{note.title}
-										</option>
-									))}
+								<option value="note">From Note</option>
+								<option value="custom">Custom</option>
+							</Form.Select>
+						</Form.Group>
+
+						{generateOptions.source === "note" ? (
+							<Form.Group className="mb-3">
+								<Form.Label>Select Note</Form.Label>
+								<Form.Select
+									value={generateOptions.sourceId}
+									onChange={(e) =>
+										setGenerateOptions({
+											...generateOptions,
+											sourceId: e.target.value,
+										})
+									}
+									required
+									disabled={generateLoading}
+								>
+									<option value="">Choose a note...</option>
+									{notes.length > 0 &&
+										notes.map((note) => (
+											<option key={note._id} value={note._id}>
+												{note.title}
+											</option>
+										))}
+								</Form.Select>
+							</Form.Group>
+						) : (
+							<>
+								<Form.Group className="mb-3">
+									<Form.Label>Deck Title</Form.Label>
+									<Form.Control
+										type="text"
+										value={generateOptions.title || ""}
+										onChange={(e) =>
+											setGenerateOptions({
+												...generateOptions,
+												title: e.target.value,
+											})
+										}
+										placeholder="Enter deck title (e.g., 'World War II Flashcards')"
+										required
+										disabled={generateLoading}
+									/>
+								</Form.Group>
+
+								<Form.Group className="mb-3">
+									<Form.Label>Custom Requirements</Form.Label>
+									<Form.Control
+										as="textarea"
+										rows={4}
+										value={generateOptions.customPrompt}
+										onChange={(e) =>
+											setGenerateOptions({
+												...generateOptions,
+												customPrompt: e.target.value,
+											})
+										}
+										placeholder="Describe your flashcard requirements (e.g., 'Create flashcards about World War II')"
+										required
+										disabled={generateLoading}
+									/>
+								</Form.Group>
+							</>
+						)}
+
+						<Form.Group className="mb-3">
+							<Form.Label>Language</Form.Label>
+							<Form.Select
+								value={generateOptions.language}
+								onChange={(e) =>
+									setGenerateOptions({
+										...generateOptions,
+										language: e.target.value,
+									})
+								}
+								disabled={generateLoading}
+							>
+								<option value="english">English</option>
+								<option value="hindi">Hindi</option>
 							</Form.Select>
 						</Form.Group>
 
@@ -758,7 +750,13 @@ const Flashcards = () => {
 					<Button
 						variant="primary"
 						onClick={generateFlashcards}
-						disabled={generateLoading || !generateOptions.noteId}
+						disabled={
+							generateLoading ||
+							(generateOptions.source === "custom"
+								? !generateOptions.customPrompt.trim() ||
+								  !generateOptions.title?.trim()
+								: !generateOptions.sourceId)
+						}
 					>
 						{generateLoading ? (
 							<Spinner size="sm" animation="border" className="me-2" />
@@ -903,110 +901,6 @@ const Flashcards = () => {
 						{updateCardLoading && (
 							<Spinner size="sm" animation="border" className="ms-2" />
 						)}
-					</Button>
-				</Modal.Footer>
-			</Modal>
-
-			{/* Study Modal */}
-			<Modal
-				show={showStudyModal}
-				onHide={() => {}}
-				size="lg"
-				backdrop="static"
-			>
-				<Modal.Header>
-					<Modal.Title className="d-flex align-items-center">
-						<span className="me-3">{currentDeck?.name}</span>
-						<Badge bg="primary">
-							<Clock size={12} className="me-1" />
-							Study Mode
-						</Badge>
-					</Modal.Title>
-				</Modal.Header>
-				<Modal.Body>
-					<div className="mb-4">
-						<div className="d-flex justify-content-between align-items-center mb-2">
-							<span>Progress</span>
-							<span>
-								{studySession.completedCards} of {studySession.totalCards}
-							</span>
-						</div>
-						<ProgressBar
-							now={
-								(studySession.completedCards / studySession.totalCards) * 100
-							}
-							className="mb-2"
-						/>
-						<div className="d-flex justify-content-between text-muted small">
-							<span>
-								Accuracy:{" "}
-								{studySession.completedCards > 0
-									? Math.round(
-											(studySession.correctAnswers /
-												studySession.completedCards) *
-												100
-									  )
-									: 0}
-								%
-							</span>
-							<span>Card {currentCardIndex + 1}</span>
-						</div>
-					</div>
-
-					{currentCard && (
-						<>
-							<FlashcardComponent
-								card={currentCard}
-								flipped={flippedCard}
-								onFlip={() => setFlippedCard(!flippedCard)}
-							/>
-
-							<div className="text-center mt-4">
-								{!flippedCard ? (
-									<Button
-										variant="outline-primary"
-										onClick={() => setFlippedCard(true)}
-									>
-										<div className="d-flex justify-content-between align-items-center">
-											<RotateCcw size={16} className="me-2" />
-											<span>Reveal Answer</span>
-										</div>
-									</Button>
-								) : (
-									<div>
-										<p className="mb-3">How well did you know this?</p>
-										<div className="d-flex gap-2 justify-content-center">
-											<Button
-												variant="danger"
-												onClick={() => handleCardResponse(false)}
-											>
-												<div className="d-flex justify-content-between align-items-center">
-													<XCircle size={16} className="me-2" />
-													<span> Incorrect </span>
-												</div>
-											</Button>
-											<Button
-												variant="success"
-												onClick={() => handleCardResponse(true)}
-											>
-												<div className="d-flex justify-content-between align-items-center">
-													<CheckCircle size={16} className="me-2" />
-													<span>Correct</span>
-												</div>
-											</Button>
-										</div>
-									</div>
-								)}
-							</div>
-						</>
-					)}
-				</Modal.Body>
-				<Modal.Footer>
-					<Button
-						variant="outline-secondary"
-						onClick={() => setShowStudyModal(false)}
-					>
-						End Session
 					</Button>
 				</Modal.Footer>
 			</Modal>
