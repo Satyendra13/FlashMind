@@ -27,8 +27,11 @@ app.use(requestLogger);
 app.use(helmet());
 app.use(rateLimiter);
 
-app.use("/", mainRouter);
+// IMPORTANT: Do NOT use express.json() or express.urlencoded() before proxy routes to avoid interfering with file uploads.
 // app.use(express.json({ limit: "500mb" }));
+// app.use(express.urlencoded({ extended: true, limit: "500mb" }));
+
+app.use("/", mainRouter);
 
 app.listen(config.PORT, () => {
 	logger.info(`API Gateway running on port ${config.PORT}`);
