@@ -20,6 +20,7 @@ const QuizTakePage = () => {
 	const [quizStartTime, setQuizStartTime] = useState(null);
 	const [totalTimeTaken, setTotalTimeTaken] = useState(0);
 	const [showSubmittingModal, setShowSubmittingModal] = useState(false);
+	const [language, setLanguage] = useState("en");
 
 	useEffect(() => {
 		const startQuiz = async () => {
@@ -34,7 +35,13 @@ const QuizTakePage = () => {
 					}
 				);
 				setQuizSession(response.data);
-				setUserAnswers(new Array(response.data.quiz.questions.length).fill(""));
+				setUserAnswers(
+					new Array(response.data.quiz.questions.length).fill({
+						en: "",
+						hi: "",
+						key: "",
+					})
+				);
 				setTimeLeft(response.data.quiz.timeLimit * 60);
 				setQuizStartTime(Date.now());
 				setQuestionTimes(
@@ -90,9 +97,13 @@ const QuizTakePage = () => {
 		// eslint-disable-next-line
 	}, [timeLeft, quizSession, submitLoading]);
 
-	const handleAnswerSelect = (answer) => {
+	const handleAnswerSelect = (optionKey) => {
 		const newAnswers = [...userAnswers];
-		newAnswers[currentQuestionIndex] = answer;
+		newAnswers[currentQuestionIndex] = {
+			...newAnswers[currentQuestionIndex],
+			[language]: optionKey,
+			key: optionKey,
+		};
 		setUserAnswers(newAnswers);
 	};
 
@@ -158,7 +169,7 @@ const QuizTakePage = () => {
 				// Calculate timeSpent for each question
 				const answersWithTime = userAnswers.map((ans, idx) => ({
 					questionIndex: idx,
-					userAnswer: ans,
+					userAnswerKey: ans.key,
 					timeSpent: questionTimes[idx]?.total || 0,
 				}));
 				// Calculate total time taken
@@ -234,6 +245,23 @@ const QuizTakePage = () => {
 						<span>{formatTime(timeLeft)}</span>
 					</div>
 				</Badge>
+				<div className="ms-auto">
+					<Button
+						variant={language === "en" ? "primary" : "outline-primary"}
+						size="sm"
+						onClick={() => setLanguage("en")}
+						className="me-2"
+					>
+						English
+					</Button>
+					<Button
+						variant={language === "hi" ? "primary" : "outline-primary"}
+						size="sm"
+						onClick={() => setLanguage("hi")}
+					>
+						हिन्दी
+					</Button>
+				</div>
 			</div>
 			<ProgressBar
 				now={
@@ -256,9 +284,10 @@ const QuizTakePage = () => {
 				<QuizQuestion
 					question={currentQuestion}
 					questionIndex={currentQuestionIndex}
-					selectedAnswer={userAnswers[currentQuestionIndex]}
+					selectedAnswer={userAnswers[currentQuestionIndex]?.key || ""}
 					quizType={quizSession.quiz.quizType}
 					onAnswerSelect={handleAnswerSelect}
+					language={language}
 				/>
 			)}
 			<div className="d-flex align-items-center mt-4">

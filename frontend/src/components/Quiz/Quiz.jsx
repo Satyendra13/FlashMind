@@ -53,7 +53,6 @@ const Quiz = () => {
 		quizType: "multiple_choice",
 		numberOfQuestions: 10,
 		timeLimit: 15,
-		language: "english",
 		customPrompt: "",
 		title: "",
 	});
@@ -140,9 +139,12 @@ const Quiz = () => {
 				return;
 			}
 			setGenerateLoading(true);
+			const optionsToSend = { ...generateOptions };
+			// Remove language if present
+			delete optionsToSend.language;
 			const response = await axios.post(
 				"/content/quizzes/generate",
-				generateOptions,
+				optionsToSend,
 				{
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -159,7 +161,6 @@ const Quiz = () => {
 				quizType: "multiple_choice",
 				numberOfQuestions: 10,
 				timeLimit: 15,
-				language: "english",
 				customPrompt: "",
 				title: "",
 			});
@@ -710,21 +711,6 @@ const Quiz = () => {
 								<option value={180}>180 minutes</option>
 								<option value={210}>210 minutes</option>
 								<option value={240}>240 minutes</option>
-							</Form.Select>
-						</Form.Group>
-						<Form.Group className="mb-3">
-							<Form.Label>Language</Form.Label>
-							<Form.Select
-								value={generateOptions.language}
-								onChange={(e) =>
-									setGenerateOptions({
-										...generateOptions,
-										language: e.target.value,
-									})
-								}
-							>
-								<option value="english">English</option>
-								<option value="hindi">Hindi</option>
 							</Form.Select>
 						</Form.Group>
 					</Form>

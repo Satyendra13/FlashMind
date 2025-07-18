@@ -21,10 +21,22 @@ const quizSchema = new mongoose.Schema(
 		},
 		questions: [
 			{
-				question: { type: String, required: true },
-				options: [String],
-				correctAnswer: { type: String, required: true },
-				explanation: String,
+				question: {
+					en: { type: String, required: true },
+					hi: { type: String, required: true },
+				},
+				options: [
+					{
+						key: { type: String, required: true },
+						en: { type: String, required: true },
+						hi: { type: String, required: true },
+					},
+				],
+				correctAnswerKey: { type: String, required: true },
+				explanation: {
+					en: { type: String },
+					hi: { type: String },
+				},
 			},
 		],
 		timeLimit: { type: Number, default: 15 },

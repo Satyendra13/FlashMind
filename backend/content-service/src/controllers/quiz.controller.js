@@ -14,7 +14,6 @@ const generateQuiz = async (req, res) => {
 			quizType = "multiple_choice",
 			numberOfQuestions = 10,
 			timeLimit = 15,
-			language = "english",
 			customPrompt = "",
 		} = req.body;
 		logger.info(
@@ -87,28 +86,35 @@ const generateQuiz = async (req, res) => {
 		const aiQuestions = await aiClient.generateQuizFromAI(content, {
 			numberOfQuestions,
 			quizType,
-			language,
 			customPrompt,
 			source,
 		});
 
 		if (aiQuestions.length === 0) {
 			logger.warn("AI service returned 0 questions. Creating a fallback.");
+			let fallbackOptions = [];
+			if (quizType === "multiple_choice") {
+				fallbackOptions = [
+					{ key: "a", en: "Topic A", hi: "विषय A" },
+					{ key: "b", en: "Topic B", hi: "विषय B" },
+					{ key: "c", en: "Topic C", hi: "विषय C" },
+					{ key: "d", en: "Topic D", hi: "विषय D" },
+				];
+			} else if (quizType === "true_false") {
+				fallbackOptions = [
+					{ key: "a", en: "True", hi: "सही" },
+					{ key: "b", en: "False", hi: "गलत" },
+				];
+			} else {
+				fallbackOptions = [
+					{ key: "a", en: "Main topic", hi: "मुख्य विषय" },
+				];
+			}
 			aiQuestions.push({
-				question: `What is the main topic covered in this ${source}?`,
-				options:
-					quizType === "multiple_choice"
-						? ["Topic A", "Topic B", "Topic C", "Topic D"]
-						: quizType === "true_false"
-							? ["True", "False"]
-							: [],
-				correctAnswer:
-					quizType === "multiple_choice"
-						? "Topic A"
-						: quizType === "true_false"
-							? "True"
-							: "Main topic",
-				explanation: "This question tests basic understanding of the content.",
+				question: { en: `What is the main topic covered in this ${source}?`, hi: `इस ${source} में मुख्य विषय क्या है?` },
+				options: fallbackOptions,
+				correctAnswerKey: "a",
+				explanation: { en: "This question tests basic understanding of the content.", hi: "यह प्रश्न सामग्री की बुनियादी समझ का परीक्षण करता है।" },
 			});
 		}
 
@@ -121,7 +127,6 @@ const generateQuiz = async (req, res) => {
 			totalQuestions: aiQuestions.length,
 			questions: aiQuestions,
 			timeLimit,
-			language,
 			customPrompt: source === "custom" ? customPrompt : undefined,
 		});
 		await quiz.save();
@@ -240,14 +245,12 @@ const completeQuizSession = async (req, res) => {
 		let correctAnswers = 0;
 		const processedAnswers = quiz.questions.map((question, index) => {
 			const answerObj = answers?.find(a => a.questionIndex === index) || {};
-			const userAnswer = answerObj.userAnswer || "";
-			const isCorrect =
-				userAnswer.toLowerCase().trim() ===
-				question.correctAnswer.toLowerCase().trim();
+			const userAnswerKey = answerObj.userAnswerKey || "";
+			const isCorrect = userAnswerKey === question.correctAnswerKey;
 			if (isCorrect) correctAnswers++;
 			return {
 				questionIndex: index,
-				userAnswer,
+				userAnswerKey,
 				isCorrect,
 				timeSpent: typeof answerObj.timeSpent === "number" ? answerObj.timeSpent : 0,
 			};
@@ -259,8 +262,20 @@ const completeQuizSession = async (req, res) => {
 			? timeTaken
 			: processedAnswers.reduce((sum, a) => sum + (a.timeSpent || 0), 0);
 
-		const explanation = await aiClient.generateExplanationFromAI(quiz.questions, processedAnswers);
-
+		let explanation = quiz.explanation;
+		if (!explanation) {
+			explanation = await aiClient.generateExplanationFromAI(quiz.questions, processedAnswers);
+			// Optionally store explanation in quiz for future reuse
+			quiz.explanation = explanation;
+			await quiz.save();
+		}
+		// Ensure each explanation item includes the options array from the quiz question
+		if (Array.isArray(explanation) && Array.isArray(quiz.questions)) {
+			explanation = explanation.map((exp, idx) => ({
+				...exp,
+				options: quiz.questions[idx]?.options || [],
+			}));
+		}
 		session.answers = processedAnswers;
 		session.score = score;
 		session.totalQuestions = quiz.questions.length;
@@ -392,6 +407,11 @@ const getSessionHistory = async (req, res) => {
 
 const getQuizExplanation = async (req, res) => {
 	try {
+		const quiz = await Quiz.findOne({ _id: req.params.id, userId: req.userId });
+		if (!quiz) {
+			logger.warn(`Quiz not found for explanation, id: ${req.params.id}`);
+			return res.status(404).json({ message: "Quiz not found" });
+		}
 		const session = await QuizSession.findOne({
 			_id: req.params.sessionId,
 			quizId: req.params.id,
@@ -401,11 +421,18 @@ const getQuizExplanation = async (req, res) => {
 			logger.warn(`Quiz session not found for explanation, sessionId: ${req.params.sessionId}`);
 			return res.status(404).json({ message: "Quiz session not found" });
 		}
-		if (!session.explanation) {
-			logger.warn(`No explanation found for sessionId: ${req.params.sessionId}`);
-			return res.status(404).json({ message: "No explanation found" });
-		}
-		res.json(session);
+		// Build explanation array from quiz.questions
+		const explanation = quiz.questions.map((q) => ({
+			question: q.question,
+			explanation: q.explanation,
+			options: q.options,
+			correctAnswerKey: q.correctAnswerKey,
+		}));
+		res.json({
+			quizTitle: quiz.title,
+			answers: session.answers,
+			explanation,
+		});
 	} catch (error) {
 		logger.error({
 			message: `Error fetching quiz explanation for sessionId: ${req.params.sessionId}`,

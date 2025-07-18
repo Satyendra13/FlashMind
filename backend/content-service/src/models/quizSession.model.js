@@ -15,17 +15,29 @@ const quizSessionSchema = new mongoose.Schema(
 		answers: [
 			{
 				questionIndex: Number,
-				userAnswer: String,
+				userAnswerKey: String,
 				isCorrect: Boolean,
 				timeSpent: Number,
 			},
 		],
 		explanation: [
 			{
-				question: String,
-				correctAnswer: String,
-				incorrectAnswers: [String],
-				explanation: String,
+				question: {
+					en: String,
+					hi: String,
+				},
+				options: [
+					{
+						key: String,
+						en: String,
+						hi: String,
+					},
+				],
+				correctAnswerKey: String,
+				explanation: {
+					en: String,
+					hi: String,
+				},
 			},
 		],
 		quizTitle: String,

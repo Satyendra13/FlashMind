@@ -7,6 +7,7 @@ const QuizQuestion = ({
 	selectedAnswer,
 	quizType,
 	onAnswerSelect,
+	language = "en",
 }) => (
 	<Card className="border-0 shadow-sm">
 		<Card.Body>
@@ -14,7 +15,9 @@ const QuizQuestion = ({
 				<h6 className="text-muted mb-0">Question {questionIndex + 1}</h6>
 				<Badge bg="primary">{quizType.replace("_", " ")}</Badge>
 			</div>
-			<h5 className="mb-4">{question.question}</h5>
+			<h5 className="mb-4">
+				{question.question?.[language] || question.question}
+			</h5>
 			{quizType === "multiple_choice" && (
 				<div>
 					{question.options?.map((option, index) => (
@@ -23,9 +26,9 @@ const QuizQuestion = ({
 							type="radio"
 							name={`question-${questionIndex}`}
 							id={`question-${questionIndex}-option-${index}`}
-							label={option}
-							checked={selectedAnswer === option}
-							onChange={() => onAnswerSelect(option)}
+							label={option?.[language] || option?.en || option?.hi || ""}
+							checked={selectedAnswer === option.key}
+							onChange={() => onAnswerSelect(option.key)}
 							className="mb-2"
 						/>
 					)) || <p className="text-muted">No options available</p>}
@@ -37,18 +40,18 @@ const QuizQuestion = ({
 						type="radio"
 						name={`question-${questionIndex}`}
 						id={`question-${questionIndex}-true`}
-						label="True"
-						checked={selectedAnswer === "True"}
-						onChange={() => onAnswerSelect("True")}
+						label={language === "hi" ? "सही" : "True"}
+						checked={selectedAnswer === (language === "hi" ? "सही" : "True")}
+						onChange={() => onAnswerSelect(language === "hi" ? "सही" : "True")}
 						className="mb-2"
 					/>
 					<Form.Check
 						type="radio"
 						name={`question-${questionIndex}`}
 						id={`question-${questionIndex}-false`}
-						label="False"
-						checked={selectedAnswer === "False"}
-						onChange={() => onAnswerSelect("False")}
+						label={language === "hi" ? "गलत" : "False"}
+						checked={selectedAnswer === (language === "hi" ? "गलत" : "False")}
+						onChange={() => onAnswerSelect(language === "hi" ? "गलत" : "False")}
 						className="mb-2"
 					/>
 				</div>
@@ -58,7 +61,9 @@ const QuizQuestion = ({
 					type="text"
 					value={selectedAnswer}
 					onChange={(e) => onAnswerSelect(e.target.value)}
-					placeholder="Enter your answer"
+					placeholder={
+						language === "hi" ? "अपना उत्तर दर्ज करें" : "Enter your answer"
+					}
 				/>
 			)}
 		</Card.Body>

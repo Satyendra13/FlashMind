@@ -12,6 +12,7 @@ const QuizExplanationPage = () => {
 	const [explanation, setExplanation] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
+	const [language, setLanguage] = useState("en");
 
 	useEffect(() => {
 		const fetchExplanation = async () => {
@@ -85,6 +86,23 @@ const QuizExplanationPage = () => {
 							<div className="text-muted" style={{ fontSize: "1.1rem" }}>
 								Quiz Review & Explanations
 							</div>
+							<div className="mt-3">
+								<Button
+									variant={language === "en" ? "primary" : "outline-primary"}
+									size="sm"
+									onClick={() => setLanguage("en")}
+									className="me-2"
+								>
+									English
+								</Button>
+								<Button
+									variant={language === "hi" ? "primary" : "outline-primary"}
+									size="sm"
+									onClick={() => setLanguage("hi")}
+								>
+									हिन्दी
+								</Button>
+							</div>
 						</Card.Body>
 					</Card>
 				</div>
@@ -95,16 +113,18 @@ const QuizExplanationPage = () => {
 					const answer = explanation.answers?.find(
 						(a) => a.questionIndex === idx
 					);
-					const userAnswer = answer?.userAnswer;
+					const userAnswerKey = answer?.userAnswerKey || "";
 					const isCorrect = answer?.isCorrect;
-					const options = [q.correctAnswer, ...(q.incorrectAnswers || [])];
+					const options = q.options || [];
 					return (
 						<Card className="mb-4 shadow" key={q._id || idx}>
 							<Card.Body>
 								<div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-2 gap-2">
 									<div className="d-flex align-items-center mb-1 mb-md-0">
 										<span className="me-2 fs-5 fw-bold">Q{idx + 1}:</span>
-										<span className="fs-5">{q.question}</span>
+										<span className="fs-5">
+											{q.question?.[language] || q.question}
+										</span>
 										{isCorrect ? (
 											<CheckCircle
 												className="ms-3 text-success"
@@ -143,8 +163,9 @@ const QuizExplanationPage = () => {
 								</div>
 								<div className="row g-2 mb-3">
 									{options.map((opt, i) => {
-										const isUser = userAnswer === opt;
-										const isCorrectOpt = q.correctAnswer === opt;
+										const optText = opt?.[language] || opt?.en || opt?.hi || "";
+										const isUser = userAnswerKey === opt.key;
+										const isCorrectOpt = q.correctAnswerKey === opt.key;
 										let bg = "bg-light";
 										let border = "border";
 										let icon = null;
@@ -172,7 +193,9 @@ const QuizExplanationPage = () => {
 													style={{ minHeight: 44 }}
 												>
 													{icon}
-													<span className={isUser ? "fw-bold" : ""}>{opt}</span>
+													<span className={isUser ? "fw-bold" : ""}>
+														{optText}
+													</span>
 													{isUser && (
 														<span className="badge bg-primary ms-2">
 															Your Answer
@@ -196,7 +219,8 @@ const QuizExplanationPage = () => {
 										>
 											<Info className="me-2 text-info" size={18} />
 											<div>
-												<strong>Explanation:</strong> {q.explanation}
+												<strong>Explanation:</strong>{" "}
+												{q.explanation?.[language] || q.explanation}
 											</div>
 										</div>
 									</div>
