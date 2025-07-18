@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ProgressBar, Badge, Button, Modal, Spinner } from "react-bootstrap";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { Clock } from "lucide-react";
+import { Clock, CheckCircle } from "lucide-react";
 import QuizQuestion from "./QuizQuestion";
 import { Modal as RBModal } from "react-bootstrap";
 
@@ -21,6 +21,7 @@ const QuizTakePage = () => {
 	const [totalTimeTaken, setTotalTimeTaken] = useState(0);
 	const [showSubmittingModal, setShowSubmittingModal] = useState(false);
 	const [language, setLanguage] = useState("en");
+	const [markedForReview, setMarkedForReview] = useState([]);
 
 	useEffect(() => {
 		const startQuiz = async () => {
@@ -41,6 +42,9 @@ const QuizTakePage = () => {
 						hi: "",
 						key: "",
 					})
+				);
+				setMarkedForReview(
+					new Array(response.data.quiz.questions.length).fill(false)
 				);
 				setTimeLeft(response.data.quiz.timeLimit * 60);
 				setQuizStartTime(Date.now());
@@ -105,6 +109,20 @@ const QuizTakePage = () => {
 			key: optionKey,
 		};
 		setUserAnswers(newAnswers);
+	};
+
+	const handleClearSelection = () => {
+		const newAnswers = [...userAnswers];
+		newAnswers[currentQuestionIndex] = { en: "", hi: "", key: "" };
+		setUserAnswers(newAnswers);
+	};
+	const handleMarkForReview = () => {
+		const newMarked = [...markedForReview];
+		newMarked[currentQuestionIndex] = !newMarked[currentQuestionIndex];
+		setMarkedForReview(newMarked);
+	};
+	const handleJumpToQuestion = (idx) => {
+		goToQuestion(idx);
 	};
 
 	const goToQuestion = (newIndex) => {
@@ -263,32 +281,87 @@ const QuizTakePage = () => {
 					</Button>
 				</div>
 			</div>
-			<ProgressBar
-				now={
-					((currentQuestionIndex + 1) /
-						(quizSession?.quiz?.questions?.length || 1)) *
-					100
-				}
-				className="mb-2"
-			/>
-			<div className="d-flex justify-content-between text-muted small mb-4">
-				<span>
-					Question {currentQuestionIndex + 1} of{" "}
-					{quizSession?.quiz?.questions?.length || 0}
-				</span>
-				<span>
-					{userAnswers.filter((answer) => answer !== "").length} answered
-				</span>
+			{/* Question Navigation Panel */}
+			<div className="mb-3">
+				<div className="d-flex flex-wrap gap-2 align-items-center justify-content-center">
+					{quizSession?.quiz?.questions?.map((q, idx) => {
+						const answered = userAnswers[idx]?.key;
+						const isCurrent = idx === currentQuestionIndex;
+						const isMarked = markedForReview[idx];
+						return (
+							<Button
+								key={idx}
+								variant={
+									isCurrent
+										? "primary"
+										: isMarked
+										? "warning"
+										: answered
+										? "success"
+										: "outline-secondary"
+								}
+								size="sm"
+								className={`rounded-circle fw-bold border-2 ${
+									isCurrent ? "shadow" : ""
+								}`}
+								onClick={() => handleJumpToQuestion(idx)}
+								style={{ width: 40, height: 40, position: "relative" }}
+								title={
+									isMarked
+										? "Marked for review"
+										: answered
+										? "Answered"
+										: "Unanswered"
+								}
+							>
+								{idx + 1}
+								{isMarked && (
+									<span style={{ position: "absolute", top: 2, right: 2 }}>
+										<CheckCircle size={14} className="text-warning" />
+									</span>
+								)}
+							</Button>
+						);
+					})}
+				</div>
 			</div>
+			{/* Question Card */}
 			{currentQuestion && (
-				<QuizQuestion
-					question={currentQuestion}
-					questionIndex={currentQuestionIndex}
-					selectedAnswer={userAnswers[currentQuestionIndex]?.key || ""}
-					quizType={quizSession.quiz.quizType}
-					onAnswerSelect={handleAnswerSelect}
-					language={language}
-				/>
+				<div className="mb-3">
+					<QuizQuestion
+						question={currentQuestion}
+						questionIndex={currentQuestionIndex}
+						selectedAnswer={userAnswers[currentQuestionIndex]?.key || ""}
+						quizType={quizSession.quiz.quizType}
+						onAnswerSelect={handleAnswerSelect}
+						language={language}
+					/>
+					<div className="d-flex flex-wrap gap-2 mt-3">
+						<Button
+							variant={
+								markedForReview[currentQuestionIndex]
+									? "warning"
+									: "outline-warning"
+							}
+							size="sm"
+							onClick={handleMarkForReview}
+							disabled={!userAnswers[currentQuestionIndex]?.key}
+						>
+							{markedForReview[currentQuestionIndex]
+								? "Unmark Review"
+								: "Mark for Review"}
+						</Button>
+						<Button
+							variant="outline-secondary"
+							size="sm"
+							onClick={handleClearSelection}
+							className="ms-2"
+							disabled={!userAnswers[currentQuestionIndex]?.key}
+						>
+							Clear Selection
+						</Button>
+					</div>
+				</div>
 			)}
 			<div className="d-flex align-items-center mt-4">
 				<Button
@@ -300,7 +373,7 @@ const QuizTakePage = () => {
 				</Button>
 				<div className="flex-grow-1 text-center">
 					<small className="text-muted">
-						{userAnswers[currentQuestionIndex]
+						{userAnswers[currentQuestionIndex]?.key
 							? "Answer selected"
 							: "Select an answer"}
 					</small>

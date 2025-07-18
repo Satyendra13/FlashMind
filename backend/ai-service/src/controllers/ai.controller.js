@@ -17,36 +17,36 @@ const generateQuiz = async (req, res) => {
 
 	if (options.quizType === "multiple_choice") {
 		prompt += `{
-  "question": { "en": "The question in English", "hi": "The question in Hindi" },
-  "options": [
-    { "key": "a", "en": "Option A in English", "hi": "Option A in Hindi" },
-    { "key": "b", "en": "Option B in English", "hi": "Option B in Hindi" },
-    { "key": "c", "en": "Option C in English", "hi": "Option C in Hindi" },
-    { "key": "d", "en": "Option D in English", "hi": "Option D in Hindi" }
-  ],
-  "correctAnswerKey": "a", // The key of the correct option
-  "explanation": { "en": "Explanation in English", "hi": "Explanation in Hindi" }
-}`;
+			"question": { "en": "The question in English", "hi": "The question in Hindi" },
+			"options": [
+				{ "key": "a", "en": "Option A in English", "hi": "Option A in Hindi" },
+				{ "key": "b", "en": "Option B in English", "hi": "Option B in Hindi" },
+				{ "key": "c", "en": "Option C in English", "hi": "Option C in Hindi" },
+				{ "key": "d", "en": "Option D in English", "hi": "Option D in Hindi" }
+			],
+			"correctAnswerKey": "a", // The key of the correct option
+			"explanation": { "en": "Explanation in English", "hi": "Explanation in Hindi" }
+			}`;
 	} else if (options.quizType === "true_false") {
 		prompt += `{
-  "question": { "en": "The statement in English", "hi": "The statement in Hindi" },
-  "options": [
-    { "key": "a", "en": "True", "hi": "सही" },
-    { "key": "b", "en": "False", "hi": "गलत" }
-  ],
-  "correctAnswerKey": "a", // or "b"
-  "explanation": { "en": "Explanation in English", "hi": "Explanation in Hindi" }
-}`;
+			"question": { "en": "The statement in English", "hi": "The statement in Hindi" },
+			"options": [
+				{ "key": "a", "en": "True", "hi": "सही" },
+				{ "key": "b", "en": "False", "hi": "गलत" }
+			],
+			"correctAnswerKey": "a", // or "b"
+			"explanation": { "en": "Explanation in English", "hi": "Explanation in Hindi" }
+			}`;
 	} else if (options.quizType === "fill_blank") {
 		prompt += `{
-  "question": { "en": "The question with [BLANK] in English", "hi": "The question with [BLANK] in Hindi" },
-  "options": [],
-  "correctAnswerKey": "a",
-  "options": [
-    { "key": "a", "en": "The answer in English", "hi": "The answer in Hindi" }
-  ],
-  "explanation": { "en": "Explanation in English", "hi": "Explanation in Hindi" }
-}`;
+			"question": { "en": "The question with [BLANK] in English", "hi": "The question with [BLANK] in Hindi" },
+			"options": [],
+			"correctAnswerKey": "a",
+			"options": [
+				{ "key": "a", "en": "The answer in English", "hi": "The answer in Hindi" }
+			],
+			"explanation": { "en": "Explanation in English", "hi": "Explanation in Hindi" }
+		}`;
 	}
 
 	prompt += `\nMake sure questions are educational, clear, and test understanding of the content.\nReturn only the JSON array, no additional text.`;

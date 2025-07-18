@@ -17,6 +17,7 @@ import Profile from "./components/Profile/Profile";
 import QuizTakePage from "./components/Quiz/QuizTakePage";
 import QuizResultsPage from "./components/Quiz/QuizResultsPage";
 import QuizExplanationPage from "./components/Quiz/QuizExplanationPage";
+import QuizResultsListPage from "./components/Quiz/QuizResultsListPage";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
@@ -169,6 +170,14 @@ function AppContent() {
 						element={
 							<ProtectedRoute>
 								<QuizExplanationPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/quiz/:quizId/results"
+						element={
+							<ProtectedRoute>
+								<QuizResultsListPage />
 							</ProtectedRoute>
 						}
 					/>

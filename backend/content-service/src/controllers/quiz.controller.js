@@ -92,30 +92,7 @@ const generateQuiz = async (req, res) => {
 
 		if (aiQuestions.length === 0) {
 			logger.warn("AI service returned 0 questions. Creating a fallback.");
-			let fallbackOptions = [];
-			if (quizType === "multiple_choice") {
-				fallbackOptions = [
-					{ key: "a", en: "Topic A", hi: "विषय A" },
-					{ key: "b", en: "Topic B", hi: "विषय B" },
-					{ key: "c", en: "Topic C", hi: "विषय C" },
-					{ key: "d", en: "Topic D", hi: "विषय D" },
-				];
-			} else if (quizType === "true_false") {
-				fallbackOptions = [
-					{ key: "a", en: "True", hi: "सही" },
-					{ key: "b", en: "False", hi: "गलत" },
-				];
-			} else {
-				fallbackOptions = [
-					{ key: "a", en: "Main topic", hi: "मुख्य विषय" },
-				];
-			}
-			aiQuestions.push({
-				question: { en: `What is the main topic covered in this ${source}?`, hi: `इस ${source} में मुख्य विषय क्या है?` },
-				options: fallbackOptions,
-				correctAnswerKey: "a",
-				explanation: { en: "This question tests basic understanding of the content.", hi: "यह प्रश्न सामग्री की बुनियादी समझ का परीक्षण करता है।" },
-			});
+			throw new Error('AI service returned 0 questions.')
 		}
 
 		const quiz = new Quiz({
@@ -262,26 +239,12 @@ const completeQuizSession = async (req, res) => {
 			? timeTaken
 			: processedAnswers.reduce((sum, a) => sum + (a.timeSpent || 0), 0);
 
-		let explanation = quiz.explanation;
-		if (!explanation) {
-			explanation = await aiClient.generateExplanationFromAI(quiz.questions, processedAnswers);
-			// Optionally store explanation in quiz for future reuse
-			quiz.explanation = explanation;
-			await quiz.save();
-		}
-		// Ensure each explanation item includes the options array from the quiz question
-		if (Array.isArray(explanation) && Array.isArray(quiz.questions)) {
-			explanation = explanation.map((exp, idx) => ({
-				...exp,
-				options: quiz.questions[idx]?.options || [],
-			}));
-		}
+
 		session.answers = processedAnswers;
 		session.score = score;
 		session.totalQuestions = quiz.questions.length;
 		session.correctAnswers = correctAnswers;
 		session.timeTaken = totalTimeTaken;
-		session.explanation = explanation;
 		session.completedAt = new Date();
 		session.isCompleted = true;
 		await session.save();
@@ -315,6 +278,7 @@ const getQuizResults = async (req, res) => {
 		const sessions = await QuizSession.find({
 			quizId: req.params.id,
 			userId: req.userId,
+			isCompleted: true
 		}).sort({ completedAt: -1 });
 		if (sessions.length === 0) {
 			logger.info(`No quiz results found for quizId: ${req.params.id}`);

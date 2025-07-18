@@ -309,6 +309,18 @@ const Quiz = () => {
 								</div>
 							</div>
 						</Button>
+						{quiz.isCompleted && (
+							<Button
+								variant="outline-info"
+								size="sm"
+								onClick={() => navigate(`/quiz/${quiz._id}/results`)}
+							>
+								<div className="d-flex align-items-center">
+									<Eye size={12} className="me-1" />
+									<span>Results</span>
+								</div>
+							</Button>
+						)}
 						<Button
 							variant="outline-danger"
 							size="sm"
