@@ -1,4 +1,7 @@
+const config = require("../config");
 const geminiService = require("../services/gemini.service");
+const llamaService = require("../services/llama.service");
+const aiService = config.useLlama ? llamaService : geminiService;
 const logger = require("../utils/logger");
 
 const generateQuiz = async (req, res) => {
@@ -52,7 +55,7 @@ const generateQuiz = async (req, res) => {
 	prompt += `\nMake sure questions are educational, clear, and test understanding of the content.\nReturn only the JSON array, no additional text.`;
 
 	try {
-		const questions = await geminiService.generateContent(prompt);
+		const questions = await aiService.generateContent(prompt);
 		logger.info(`Successfully generated ${questions.length} quiz questions.`);
 		res.status(200).json({ questions });
 	} catch (error) {
@@ -93,7 +96,7 @@ const generateFlashcards = async (req, res) => {
     Return only the JSON array, no additional text.`;
 
 	try {
-		const flashcards = await geminiService.generateContent(prompt);
+		const flashcards = await aiService.generateContent(prompt);
 		logger.info(`Successfully generated ${flashcards.length} flashcards.`);
 		res.status(200).json({ flashcards });
 	} catch (error) {
@@ -147,7 +150,7 @@ const generateExplanation = async (req, res) => {
 
 
 	try {
-		const explanation = await geminiService.generateContent(prompt);
+		const explanation = await aiService.generateContent(prompt);
 		if (explanation.length === 0) {
 			logger.error({
 				message: "Failed to generate explanation",

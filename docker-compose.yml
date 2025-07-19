@@ -7,6 +7,8 @@ services:
     env_file: ./backend/api-gateway/.env
     ports:
       - "5000:5000"
+    networks:
+      - app-network
 
   auth-service:
     build:
@@ -16,16 +18,8 @@ services:
       - "5001:5001"
     depends_on:
       - api-gateway
-
-  ai-service:
-    build:
-      context: ./backend/ai-service
-    env_file: ./backend/ai-service/.env
-    ports:
-      - "5002:5002"
-    depends_on:
-      - auth-service
-      - content-service
+    networks:
+      - app-network
 
   content-service:
     build:
@@ -36,6 +30,34 @@ services:
     depends_on:
       - auth-service
       - api-gateway
+    networks:
+      - app-network
+
+  ai-service:
+    build:
+      context: ./backend/ai-service
+    env_file: ./backend/ai-service/.env
+    ports:
+      - "5002:5002"
+    depends_on:
+      - auth-service
+      - content-service
+      - ai-llama3
+    networks:
+      - app-network
+
+  ai-llama3:
+    build:
+      context: ./backend/ai-llama3
+    container_name: ai-llama3
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - app-network
+
 
   frontend:
     build:
@@ -43,6 +65,15 @@ services:
     environment:
       - VITE_API_URL=http://api-gateway:5000/api
     ports:
-      - "5173:5173"
+      - "4173:4173"
     depends_on:
       - api-gateway
+    networks:
+      - app-network
+
+volumes:
+  ollama_data:
+
+networks:
+  app-network:
+    driver: bridge
