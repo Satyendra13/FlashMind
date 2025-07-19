@@ -7,6 +7,11 @@ import { Clock, CheckCircle } from "lucide-react";
 import QuizQuestion from "./QuizQuestion";
 import { Modal as RBModal } from "react-bootstrap";
 
+// Utility to detect touch device
+const isTouchDevice =
+	typeof window !== "undefined" &&
+	("ontouchstart" in window || navigator.maxTouchPoints > 0);
+
 const QuizTakePage = () => {
 	const { quizId } = useParams();
 	const location = useLocation();
@@ -31,6 +36,12 @@ const QuizTakePage = () => {
 	const [isSavingProgress, setIsSavingProgress] = useState(false);
 	const [pendingNavigation, setPendingNavigation] = useState(null);
 	const [isQuizCompleted, setIsQuizCompleted] = useState(false); // NEW: Track quiz completion
+	const [swipeHandled, setSwipeHandled] = useState(false);
+	const touchStartX = useRef(null);
+	const touchEndX = useRef(null);
+	// Animation state for swipe
+	const [swipeDirection, setSwipeDirection] = useState(null); // 'left' or 'right' or null
+	const [isAnimating, setIsAnimating] = useState(false);
 
 	// Scroll left/right by a fixed amount
 	const scrollNav = (direction) => {
@@ -561,6 +572,58 @@ const QuizTakePage = () => {
 		return () => clearInterval(autoSaveInterval);
 	}, [shouldBlock, userAnswers, questionTimes]);
 
+	// Swipe handlers for Question Card
+	const handleTouchStart = (e) => {
+		if (!isTouchDevice || swipeHandled || isAnimating) return;
+		touchStartX.current = e.touches[0].clientX;
+	};
+	const handleTouchMove = (e) => {
+		if (!isTouchDevice || swipeHandled || isAnimating) return;
+		touchEndX.current = e.touches[0].clientX;
+	};
+	const handleTouchEnd = () => {
+		if (
+			!isTouchDevice ||
+			swipeHandled ||
+			isAnimating ||
+			touchStartX.current === null ||
+			touchEndX.current === null
+		)
+			return;
+		const dx = touchEndX.current - touchStartX.current;
+		const threshold = 50; // px
+		if (Math.abs(dx) > threshold) {
+			if (dx > 0 && currentQuestionIndex > 0) {
+				setSwipeDirection("right");
+				setIsAnimating(true);
+			} else if (
+				dx < 0 &&
+				currentQuestionIndex < (quizSession?.quiz?.questions?.length || 0) - 1
+			) {
+				setSwipeDirection("left");
+				setIsAnimating(true);
+			}
+			setSwipeHandled(true);
+		}
+		touchStartX.current = null;
+		touchEndX.current = null;
+	};
+
+	// Handle animation end to change question after swipe
+	const handleAnimationEnd = () => {
+		if (swipeDirection === "left") {
+			handleNextQuestion();
+		} else if (swipeDirection === "right") {
+			handlePreviousQuestion();
+		}
+		setIsAnimating(false);
+		setSwipeDirection(null);
+	};
+	// Reset swipeHandled when question changes
+	useEffect(() => {
+		setSwipeHandled(false);
+	}, [currentQuestionIndex]);
+
 	if (loading) {
 		return (
 			<div className="d-flex justify-content-center align-items-center min-vh-100">
@@ -690,10 +753,6 @@ const QuizTakePage = () => {
 								</Button>
 							);
 						})}
-						{/* Hide scrollbar (for most browsers) */}
-						<style>{`
-							.flex-nowrap::-webkit-scrollbar { display: none; }
-						`}</style>
 					</div>
 					{/* Right Scroll Button */}
 					<Button
@@ -710,7 +769,22 @@ const QuizTakePage = () => {
 			</div>
 			{/* Question Card */}
 			{currentQuestion && (
-				<div className="mb-3">
+				// Attach touch handlers and animation classes only if touch device
+				<div
+					className={`mb-3 ${
+						isAnimating && swipeDirection
+							? `swipe-animate swipe-${swipeDirection}`
+							: ""
+					}`}
+					{...(isTouchDevice
+						? {
+								onTouchStart: handleTouchStart,
+								onTouchMove: handleTouchMove,
+								onTouchEnd: handleTouchEnd,
+						  }
+						: {})}
+					onAnimationEnd={isAnimating ? handleAnimationEnd : undefined}
+				>
 					<QuizQuestion
 						question={currentQuestion}
 						questionIndex={currentQuestionIndex}

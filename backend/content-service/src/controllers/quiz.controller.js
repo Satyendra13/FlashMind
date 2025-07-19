@@ -268,10 +268,10 @@ const completeQuizSession = async (req, res) => {
 		session.timeTaken = totalTimeTaken;
 		session.completedAt = new Date();
 		session.isCompleted = true;
-		await session.save();
 		quiz.isCompleted = true;
 		quiz.status = 'completed';
 		quiz.activeSessionId = null;
+		await session.save();
 		await quiz.save();
 		logger.info(
 			`Quiz session completed successfully, sessionId: ${sessionId}, score: ${score}`

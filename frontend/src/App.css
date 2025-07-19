@@ -815,3 +815,24 @@ html {
   width: 300px;
   height: 300px;
 }
+
+.swipe-animate {
+  animation-duration: 0.35s;
+  animation-fill-mode: forwards;
+}
+.swipe-left {
+  animation-name: swipeLeft;
+}
+.swipe-right {
+  animation-name: swipeRight;
+}
+@keyframes swipeLeft {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(-100vw); opacity: 0; }
+}
+@keyframes swipeRight {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(100vw); opacity: 0; }
+}
+
+.flex-nowrap::-webkit-scrollbar { display: none; }

@@ -298,7 +298,15 @@ const Quiz = () => {
 							<div className="d-flex justify-content-between align-items-center">
 								<div className="d-flex justify-content-between align-items-center">
 									<Play size={12} className="me-1" />
-									<span>{quiz.isCompleted ? "Retake" : "Start"}</span>
+									<span>
+										{quiz.activeSessionId === null &&
+										quiz.status === "completed"
+											? "Retake"
+											: quiz.status === "inprogress" &&
+											  quiz.activeSessionId !== null
+											? "Resume"
+											: "Start"}
+									</span>
 								</div>
 							</div>
 						</Button>
@@ -328,75 +336,6 @@ const Quiz = () => {
 						</Button>
 					</div>
 				</div>
-			</Card.Body>
-		</Card>
-	);
-
-	const QuestionComponent = ({
-		question,
-		questionIndex,
-		selectedAnswer,
-		onAnswerSelect,
-	}) => (
-		<Card className="border-0 shadow-sm">
-			<Card.Body>
-				<div className="d-flex justify-content-between align-items-center mb-3">
-					<h6 className="text-muted mb-0">Question {questionIndex + 1}</h6>
-					<Badge bg="primary">
-						{currentQuiz?.quiz?.quizType.replace("_", " ")}
-					</Badge>
-				</div>
-
-				<h5 className="mb-4">{question.question}</h5>
-
-				{currentQuiz?.quiz?.quizType === "multiple_choice" && (
-					<div>
-						{question.options?.map((option, index) => (
-							<Form.Check
-								key={index}
-								type="radio"
-								name={`question-${questionIndex}`}
-								id={`question-${questionIndex}-option-${index}`}
-								label={option}
-								checked={selectedAnswer === option}
-								onChange={() => onAnswerSelect(option)}
-								className="mb-2"
-							/>
-						)) || <p className="text-muted">No options available</p>}
-					</div>
-				)}
-
-				{currentQuiz?.quiz?.quizType === "true_false" && (
-					<div>
-						<Form.Check
-							type="radio"
-							name={`question-${questionIndex}`}
-							id={`question-${questionIndex}-true`}
-							label="True"
-							checked={selectedAnswer === "True"}
-							onChange={() => onAnswerSelect("True")}
-							className="mb-2"
-						/>
-						<Form.Check
-							type="radio"
-							name={`question-${questionIndex}`}
-							id={`question-${questionIndex}-false`}
-							label="False"
-							checked={selectedAnswer === "False"}
-							onChange={() => onAnswerSelect("False")}
-							className="mb-2"
-						/>
-					</div>
-				)}
-
-				{currentQuiz?.quiz?.quizType === "fill_blank" && (
-					<Form.Control
-						type="text"
-						value={selectedAnswer}
-						onChange={(e) => onAnswerSelect(e.target.value)}
-						placeholder="Enter your answer"
-					/>
-				)}
 			</Card.Body>
 		</Card>
 	);
