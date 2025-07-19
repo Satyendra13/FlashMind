@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ProgressBar, Badge, Button, Modal, Spinner } from "react-bootstrap";
 import axios from "axios";
@@ -22,6 +22,44 @@ const QuizTakePage = () => {
 	const [showSubmittingModal, setShowSubmittingModal] = useState(false);
 	const [language, setLanguage] = useState("en");
 	const [markedForReview, setMarkedForReview] = useState([]);
+	const [isDragging, setIsDragging] = useState(false);
+	const [dragStartX, setDragStartX] = useState(0);
+	const [scrollStartX, setScrollStartX] = useState(0);
+	const navScrollRef = useRef(null);
+
+	// Scroll left/right by a fixed amount
+	const scrollNav = (direction) => {
+		const container = navScrollRef.current;
+		if (!container) return;
+		const scrollAmount = 120; // px
+		container.scrollBy({ left: direction * scrollAmount, behavior: "smooth" });
+	};
+
+	// Drag/slide handlers
+	const handleDragStart = (e) => {
+		setIsDragging(true);
+		setDragStartX(e.type === "touchstart" ? e.touches[0].clientX : e.clientX);
+		setScrollStartX(navScrollRef.current.scrollLeft);
+	};
+	const handleDragMove = (e) => {
+		if (!isDragging) return;
+		const x = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
+		const dx = dragStartX - x;
+		navScrollRef.current.scrollLeft = scrollStartX + dx;
+	};
+	const handleDragEnd = () => {
+		setIsDragging(false);
+	};
+
+	// Prevent click if dragging
+	const handleNavButtonClick = (e, idx) => {
+		if (isDragging) {
+			e.preventDefault();
+			e.stopPropagation();
+			return;
+		}
+		handleJumpToQuestion(idx);
+	};
 
 	useEffect(() => {
 		const startQuiz = async () => {
@@ -283,46 +321,109 @@ const QuizTakePage = () => {
 			</div>
 			{/* Question Navigation Panel */}
 			<div className="mb-3">
-				<div className="d-flex flex-wrap gap-2 align-items-center justify-content-center">
-					{quizSession?.quiz?.questions?.map((q, idx) => {
-						const answered = userAnswers[idx]?.key;
-						const isCurrent = idx === currentQuestionIndex;
-						const isMarked = markedForReview[idx];
-						return (
-							<Button
-								key={idx}
-								variant={
-									isCurrent
-										? "primary"
-										: isMarked
-										? "warning"
-										: answered
-										? "success"
-										: "outline-secondary"
-								}
-								size="sm"
-								className={`rounded-circle fw-bold border-2 ${
-									isCurrent ? "shadow" : ""
-								}`}
-								onClick={() => handleJumpToQuestion(idx)}
-								style={{ width: 40, height: 40, position: "relative" }}
-								title={
-									isMarked
-										? "Marked for review"
-										: answered
-										? "Answered"
-										: "Unanswered"
-								}
-							>
-								{idx + 1}
-								{isMarked && (
-									<span style={{ position: "absolute", top: 2, right: 2 }}>
-										<CheckCircle size={14} className="text-warning" />
-									</span>
-								)}
-							</Button>
-						);
-					})}
+				<div
+					className="d-flex align-items-center justify-content-center position-relative"
+					style={{ minHeight: 56 }}
+				>
+					{/* Left Scroll Button */}
+					<Button
+						variant="light"
+						size="sm"
+						className="me-2 px-2 border"
+						style={{ zIndex: 2, boxShadow: "0 0 6px rgba(0,0,0,0.04)" }}
+						onClick={() => scrollNav(-1)}
+						aria-label="Scroll left"
+					>
+						&lt;
+					</Button>
+					{/* Scrollable Nav */}
+					<div
+						ref={navScrollRef}
+						className="flex-nowrap d-flex gap-2 align-items-center"
+						style={{
+							overflowX: "auto",
+							WebkitOverflowScrolling: "touch",
+							scrollbarWidth: "none",
+							msOverflowStyle: "none",
+							maxWidth: "80vw",
+							paddingBottom: 4,
+						}}
+						onMouseDown={handleDragStart}
+						onMouseMove={handleDragMove}
+						onMouseUp={handleDragEnd}
+						onMouseLeave={handleDragEnd}
+						onTouchStart={handleDragStart}
+						onTouchMove={handleDragMove}
+						onTouchEnd={handleDragEnd}
+					>
+						{quizSession?.quiz?.questions?.map((q, idx) => {
+							const answered = userAnswers[idx]?.key;
+							const isCurrent = idx === currentQuestionIndex;
+							const isMarked = markedForReview[idx];
+							return (
+								<Button
+									key={idx}
+									variant={
+										isCurrent
+											? "primary"
+											: isMarked
+											? "warning"
+											: answered
+											? "success"
+											: "outline-secondary"
+									}
+									size="sm"
+									className={`rounded-circle fw-bold border-2 ${
+										isCurrent ? "shadow" : ""
+									}`}
+									style={{
+										width: 40,
+										height: 40,
+										minWidth: 40,
+										minHeight: 40,
+										borderRadius: "50%",
+										padding: 0,
+										position: "relative",
+										userSelect: "none",
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+									}}
+									onClick={(e) => handleNavButtonClick(e, idx)}
+									title={
+										isMarked
+											? "Marked for review"
+											: answered
+											? "Answered"
+											: "Unanswered"
+									}
+									draggable={false}
+								>
+									{idx + 1}
+									{isMarked && (
+										<span style={{ position: "absolute", top: 2, right: 2 }}>
+											<CheckCircle size={14} className="text-warning" />
+										</span>
+									)}
+								</Button>
+							);
+						})}
+						{/* Hide scrollbar (for most browsers) */}
+						<style>{`
+							.flex-nowrap::-webkit-scrollbar { display: none; }
+						`}</style>
+					</div>
+					{/* Right Scroll Button */}
+					<Button
+						variant="light"
+						size="sm"
+						className="ms-2 px-2 border"
+						style={{ zIndex: 2, boxShadow: "0 0 6px rgba(0,0,0,0.04)" }}
+						onClick={() => scrollNav(1)}
+						aria-label="Scroll right"
+					>
+						&gt;
+					</Button>
 				</div>
 			</div>
 			{/* Question Card */}

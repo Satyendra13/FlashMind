@@ -42,23 +42,8 @@ services:
     depends_on:
       - auth-service
       - content-service
-      - ai-llama3
     networks:
       - app-network
-
-  ai-llama3:
-    build:
-      context: ./backend/ai-llama3
-    container_name: ai-llama3
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    networks:
-      - app-network
-
-
   frontend:
     build:
       context: ./frontend
@@ -70,9 +55,6 @@ services:
       - api-gateway
     networks:
       - app-network
-
-volumes:
-  ollama_data:
 
 networks:
   app-network:

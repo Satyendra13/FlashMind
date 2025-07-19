@@ -10,7 +10,12 @@ const apiClient = axios.create({
 const generateQuizFromAI = async (content, options) => {
 	try {
 		logger.info("Sending request to AI service to generate quiz.");
-		const response = await apiClient.post("/quiz", { content, options });
+		const response = await apiClient.post("/quiz", { content, options }, {
+			timeout: 180000, // Extended to 2 minutes for moderate sizes
+			maxContentLength: Infinity,
+			maxBodyLength: Infinity
+		});
+		console.log(response.data.questions, "response.data.questions")
 		logger.info("Received quiz data from AI service.");
 		return response.data.questions || [];
 	} catch (error) {
