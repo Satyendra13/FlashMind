@@ -41,6 +41,15 @@ const quizSchema = new mongoose.Schema(
 		],
 		timeLimit: { type: Number, default: 15 },
 		isCompleted: { type: Boolean, default: false },
+		status: {
+			type: String,
+			enum: ['completed', 'pending', 'inprogress'],
+			default: 'pending',
+		},
+		activeSessionId: {
+			type: mongoose.Schema.Types.ObjectId,
+			default: null,
+		},
 	},
 	{ timestamps: true }
 );

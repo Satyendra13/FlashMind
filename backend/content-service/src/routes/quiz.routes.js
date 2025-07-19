@@ -28,6 +28,11 @@ router.get(
 	authMiddleware,
 	quizController.getQuizExplanation
 );
+router.post(
+	'/:id/session/:sessionId/save-progress',
+	authMiddleware,
+	quizController.saveQuizProgress
+);
 router.delete("/:id", authMiddleware, quizController.deleteQuiz);
 
 module.exports = router;

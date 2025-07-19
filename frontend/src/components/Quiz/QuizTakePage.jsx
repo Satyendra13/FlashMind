@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ProgressBar, Badge, Button, Modal, Spinner } from "react-bootstrap";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -9,6 +9,7 @@ import { Modal as RBModal } from "react-bootstrap";
 
 const QuizTakePage = () => {
 	const { quizId } = useParams();
+	const location = useLocation();
 	const navigate = useNavigate();
 	const [quizSession, setQuizSession] = useState(null);
 	const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -26,6 +27,10 @@ const QuizTakePage = () => {
 	const [dragStartX, setDragStartX] = useState(0);
 	const [scrollStartX, setScrollStartX] = useState(0);
 	const navScrollRef = useRef(null);
+	const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+	const [isSavingProgress, setIsSavingProgress] = useState(false);
+	const [pendingNavigation, setPendingNavigation] = useState(null);
+	const [isQuizCompleted, setIsQuizCompleted] = useState(false); // NEW: Track quiz completion
 
 	// Scroll left/right by a fixed amount
 	const scrollNav = (direction) => {
@@ -64,9 +69,11 @@ const QuizTakePage = () => {
 	useEffect(() => {
 		const startQuiz = async () => {
 			try {
+				let sessionId = location.state?.sessionId || null;
+				let postData = sessionId ? { sessionId } : {};
 				const response = await axios.post(
 					`/content/quizzes/${quizId}/start`,
-					{},
+					postData,
 					{
 						headers: {
 							Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -74,23 +81,72 @@ const QuizTakePage = () => {
 					}
 				);
 				setQuizSession(response.data);
-				setUserAnswers(
-					new Array(response.data.quiz.questions.length).fill({
+				// If resuming, restore answers and timer
+				if (
+					response.data.sessionId &&
+					response.data.quiz.status === "inprogress" &&
+					response.data.quiz.activeSessionId
+				) {
+					const sessionRes = await axios.get(
+						`/content/quizzes/${quizId}/results/${response.data.sessionId}`,
+						{
+							headers: {
+								Authorization: `Bearer ${localStorage.getItem("token")}`,
+							},
+						}
+					);
+					const session = sessionRes.data;
+					const restoredAnswers = (session.answers || []).map((ans) => ({
 						en: "",
 						hi: "",
-						key: "",
-					})
-				);
-				setMarkedForReview(
-					new Array(response.data.quiz.questions.length).fill(false)
-				);
-				setTimeLeft(response.data.quiz.timeLimit * 60);
-				setQuizStartTime(Date.now());
-				setQuestionTimes(
-					new Array(response.data.quiz.questions.length)
-						.fill(null)
-						.map(() => ({ start: null, total: 0 }))
-				);
+						key: ans.userAnswerKey || "",
+					}));
+					setUserAnswers(
+						restoredAnswers.length > 0
+							? restoredAnswers
+							: new Array(response.data.quiz.questions.length).fill({
+									en: "",
+									hi: "",
+									key: "",
+							  })
+					);
+					setMarkedForReview(
+						new Array(response.data.quiz.questions.length).fill(false)
+					);
+					setTimeLeft(
+						typeof session.timeTaken === "number"
+							? Math.max(
+									response.data.quiz.timeLimit * 60 - session.timeTaken,
+									1
+							  )
+							: response.data.quiz.timeLimit * 60
+					);
+					setQuizStartTime(Date.now());
+					setQuestionTimes(
+						(session.answers || []).map((a) => ({
+							start: null,
+							total: a.timeSpent || 0,
+						}))
+					);
+				} else {
+					setUserAnswers(
+						new Array(response.data.quiz.questions.length).fill({
+							en: "",
+							hi: "",
+							key: "",
+						})
+					);
+					setMarkedForReview(
+						new Array(response.data.quiz.questions.length).fill(false)
+					);
+					setTimeLeft(response.data.quiz.timeLimit * 60);
+					setQuizStartTime(Date.now());
+					setQuestionTimes(
+						new Array(response.data.quiz.questions.length)
+							.fill(null)
+							.map(() => ({ start: null, total: 0 }))
+					);
+				}
 			} catch (error) {
 				toast.error("Failed to start quiz");
 				navigate("/quiz");
@@ -205,6 +261,8 @@ const QuizTakePage = () => {
 	const handleSubmitQuiz = async () => {
 		setSubmitLoading(true);
 		setShowSubmittingModal(true);
+		setIsQuizCompleted(true); // FIXED: Mark quiz as completed to prevent blocking
+
 		// Stop timing current question
 		setQuestionTimes((prev) => {
 			const arr = [...prev];
@@ -247,14 +305,17 @@ const QuizTakePage = () => {
 						},
 					}
 				);
+				// Use regular navigate after quiz completion
 				navigate(
 					`/quiz/${quizSession.quiz._id}/results/${quizSession.sessionId}`,
 					{
 						state: { sessionId: quizSession.sessionId },
+						replace: true, // Use replace to avoid navigation blocking
 					}
 				);
 			} catch (error) {
 				toast.error("Failed to submit quiz");
+				setIsQuizCompleted(false); // Reset if submission fails
 			} finally {
 				setSubmitLoading(false);
 				setShowSubmittingModal(false);
@@ -268,16 +329,237 @@ const QuizTakePage = () => {
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 	};
 
+	// Save progress API call - improved with proper error handling
+	const saveProgress = async () => {
+		if (!quizSession?.sessionId || isSavingProgress) return;
+
+		setIsSavingProgress(true);
+		try {
+			// Stop timing current question before saving
+			const currentTimes = [...questionTimes];
+			if (
+				currentTimes[currentQuestionIndex] &&
+				currentTimes[currentQuestionIndex].start != null
+			) {
+				currentTimes[currentQuestionIndex].total += Math.floor(
+					(Date.now() - currentTimes[currentQuestionIndex].start) / 1000
+				);
+			}
+
+			const answersWithTime = userAnswers.map((ans, idx) => ({
+				questionIndex: idx,
+				userAnswerKey: ans.key,
+				timeSpent: currentTimes[idx]?.total || 0,
+			}));
+			const totalTime = currentTimes.reduce(
+				(sum, q) => sum + (q?.total || 0),
+				0
+			);
+
+			await axios.post(
+				`/content/quizzes/${quizSession.quiz._id}/session/${quizSession.sessionId}/save-progress`,
+				{
+					answers: answersWithTime,
+					timeTaken: totalTime,
+				},
+				{
+					headers: {
+						Authorization: `Bearer ${localStorage.getItem("token")}`,
+					},
+				}
+			);
+			return true;
+		} catch (error) {
+			console.error("Failed to save progress:", error);
+			return false;
+		} finally {
+			setIsSavingProgress(false);
+		}
+	};
+
+	// FIXED: Updated blocking condition to consider quiz completion
+	const shouldBlock =
+		!submitLoading && !isQuizCompleted && quizSession && quizSession.sessionId;
+
+	// Custom navigation blocking using history
 	useEffect(() => {
-		const handleBeforeUnload = (e) => {
-			if (submitLoading) {
-				e.preventDefault();
-				e.returnValue = "";
+		if (!shouldBlock) return;
+
+		// Override browser back button
+		const handlePopState = (event) => {
+			event.preventDefault();
+			// Push the current state back to prevent navigation
+			window.history.pushState(null, null, window.location.pathname);
+			setShowLeaveDialog(true);
+			setPendingNavigation("back");
+		};
+
+		// Push an entry to history so we can detect back button
+		window.history.pushState(null, null, window.location.pathname);
+		window.addEventListener("popstate", handlePopState);
+
+		// Block all link clicks and navigation attempts
+		const handleLinkClick = (event) => {
+			const target = event.target.closest(
+				'a, button[onclick], [role="button"]'
+			);
+			if (target && !target.closest(".quiz-take-page")) {
+				// Check if it's a navigation link (has href or onclick that navigates)
+				const href = target.getAttribute("href");
+				const onClick = target.getAttribute("onclick");
+
+				if (href || onClick || target.classList.contains("nav-link")) {
+					event.preventDefault();
+					event.stopPropagation();
+					setShowLeaveDialog(true);
+
+					if (href) {
+						setPendingNavigation(() => () => navigate(href));
+					} else {
+						setPendingNavigation(() => () => target.click());
+					}
+				}
 			}
 		};
+
+		// Add click listener to document to catch all navigation attempts
+		document.addEventListener("click", handleLinkClick, true);
+
+		return () => {
+			window.removeEventListener("popstate", handlePopState);
+			document.removeEventListener("click", handleLinkClick, true);
+		};
+	}, [shouldBlock, navigate]);
+
+	const confirmLeave = async () => {
+		setShowLeaveDialog(false);
+
+		// Temporarily disable blocking to allow navigation
+		setIsQuizCompleted(true);
+
+		try {
+			await saveProgress();
+
+			// Small delay to ensure state updates
+			setTimeout(() => {
+				// Handle the pending navigation
+				if (pendingNavigation === "back") {
+					// UPDATED: Navigate to /quiz instead of going back
+					navigate("/quiz");
+				} else if (
+					pendingNavigation &&
+					typeof pendingNavigation === "function"
+				) {
+					// Execute pending navigation function
+					pendingNavigation();
+				}
+				setPendingNavigation(null);
+			}, 100);
+		} catch (error) {
+			console.error("Error saving progress before leaving:", error);
+			// Still proceed with navigation even if save fails
+			setTimeout(() => {
+				if (pendingNavigation === "back") {
+					// UPDATED: Navigate to /quiz instead of going back
+					navigate("/quiz");
+				} else if (
+					pendingNavigation &&
+					typeof pendingNavigation === "function"
+				) {
+					pendingNavigation();
+				}
+				setPendingNavigation(null);
+			}, 100);
+		}
+	};
+
+	const cancelLeave = () => {
+		setShowLeaveDialog(false);
+		setPendingNavigation(null);
+		// Re-enable blocking if it was temporarily disabled
+		if (isQuizCompleted && quizSession && quizSession.sessionId) {
+			setIsQuizCompleted(false);
+		}
+	};
+
+	// Custom navigate function that shows confirmation
+	const navigateWithConfirmation = (path) => {
+		if (shouldBlock) {
+			setShowLeaveDialog(true);
+			setPendingNavigation(() => () => navigate(path));
+		} else {
+			navigate(path);
+		}
+	};
+
+	// FIXED: Enhanced beforeunload handler with custom modal option
+	useEffect(() => {
+		const handleBeforeUnload = (e) => {
+			if (shouldBlock && !isSavingProgress) {
+				// For page refresh/close, show browser's native dialog
+				e.preventDefault();
+				e.returnValue =
+					"Are you sure you want to leave? Your quiz progress will be saved.";
+
+				// Attempt to save progress in background
+				// Note: This might not complete before the page unloads
+				saveProgress().catch(console.error);
+
+				return e.returnValue;
+			}
+		};
+
+		// ALTERNATIVE: If you want to show custom modal for page reload too
+		// (Note: This won't work for closing the tab/browser window)
+		const handleKeyDown = (e) => {
+			// Detect Ctrl+R (Windows) or Cmd+R (Mac) for reload
+			if (shouldBlock && (e.ctrlKey || e.metaKey) && e.key === "r") {
+				e.preventDefault();
+				setShowLeaveDialog(true);
+				setPendingNavigation(() => () => window.location.reload());
+			}
+			// Detect F5 for reload
+			if (shouldBlock && e.key === "F5") {
+				e.preventDefault();
+				setShowLeaveDialog(true);
+				setPendingNavigation(() => () => window.location.reload());
+			}
+		};
+
 		window.addEventListener("beforeunload", handleBeforeUnload);
-		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-	}, [submitLoading]);
+		window.addEventListener("keydown", handleKeyDown);
+
+		return () => {
+			window.removeEventListener("beforeunload", handleBeforeUnload);
+			window.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [shouldBlock, isSavingProgress]);
+
+	// Handle visibility change (when tab becomes hidden)
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "hidden" && shouldBlock) {
+				// Save progress when tab becomes hidden
+				saveProgress().catch(console.error);
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () => {
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+		};
+	}, [shouldBlock]);
+
+	// Auto-save progress periodically
+	useEffect(() => {
+		if (!shouldBlock) return;
+
+		const autoSaveInterval = setInterval(() => {
+			saveProgress().catch(console.error);
+		}, 30000); // Auto-save every 30 seconds
+
+		return () => clearInterval(autoSaveInterval);
+	}, [shouldBlock, userAnswers, questionTimes]);
 
 	if (loading) {
 		return (
@@ -292,7 +574,7 @@ const QuizTakePage = () => {
 	const currentQuestion = quizSession?.quiz?.questions?.[currentQuestionIndex];
 
 	return (
-		<div className="container py-4">
+		<div className="container py-4 quiz-take-page">
 			<div className="d-flex align-items-center mb-4">
 				<h2 className="me-3">{quizSession?.quiz?.title}</h2>
 				<Badge bg={timeLeft < 60 ? "danger" : "primary"}>
@@ -507,6 +789,42 @@ const QuizTakePage = () => {
 					<h5>Submitting your responses...</h5>
 					<div className="text-muted mt-2">
 						Please wait while we save your quiz results.
+					</div>
+				</RBModal.Body>
+			</RBModal>
+			{/* Leave confirmation modal */}
+			<RBModal
+				show={showLeaveDialog}
+				centered
+				backdrop="static"
+				keyboard={false}
+			>
+				<RBModal.Body className="text-center py-5">
+					<h5>Are you sure you want to leave?</h5>
+					<div className="text-muted mt-2 mb-4">
+						Your quiz progress will be saved and you can resume later.
+					</div>
+					{isSavingProgress && (
+						<div className="mb-3">
+							<Spinner animation="border" size="sm" className="me-2" />
+							<span>Saving progress...</span>
+						</div>
+					)}
+					<div className="d-flex justify-content-center gap-3">
+						<Button
+							variant="danger"
+							onClick={confirmLeave}
+							disabled={isSavingProgress}
+						>
+							{isSavingProgress ? "Saving..." : "Leave & Save Progress"}
+						</Button>
+						<Button
+							variant="secondary"
+							onClick={cancelLeave}
+							disabled={isSavingProgress}
+						>
+							Stay on Page
+						</Button>
 					</div>
 				</RBModal.Body>
 			</RBModal>

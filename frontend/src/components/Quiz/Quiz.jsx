@@ -175,18 +175,11 @@ const Quiz = () => {
 	const startQuiz = async (quiz) => {
 		try {
 			setStartQuizLoading(quiz._id);
-			// Start quiz session
-			const response = await axios.post(
-				`/content/quizzes/${quiz._id}/start`,
-				{},
-				{
-					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
-					},
-				}
-			);
+			// Start quiz session (do not call API here, let take page handle resume)
 			// Instead of opening modal, navigate to take page
-			navigate(`/quiz/${quiz._id}/take`);
+			navigate(`/quiz/${quiz._id}/take`, {
+				state: { sessionId: quiz.activeSessionId || null },
+			});
 		} catch (error) {
 			console.error("Start quiz error:", error);
 			toast.error("Failed to start quiz");

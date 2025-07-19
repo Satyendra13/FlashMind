@@ -170,6 +170,24 @@ const startQuizSession = async (req, res) => {
 			logger.warn(`Quiz not found for starting session, id: ${req.params.id}`);
 			return res.status(404).json({ message: "Quiz not found" });
 		}
+		// Accept sessionId from body or query
+		const sessionId = quiz.activeSessionId || null;
+		if (sessionId) {
+			const existingSession = await QuizSession.findOne({
+				_id: sessionId,
+				quizId: quiz._id,
+				userId: req.userId,
+				isCompleted: false
+			});
+			if (existingSession) {
+				quiz.status = 'inprogress';
+				quiz.activeSessionId = sessionId;
+				await quiz.save();
+				logger.info(`Resuming existing quiz session, sessionId: ${sessionId}`);
+				return res.json({ message: "Quiz session resumed", sessionId, quiz });
+			}
+		}
+		// No valid session, create new
 		const session = new QuizSession({
 			userId: req.userId,
 			quizId: quiz._id,
@@ -179,6 +197,9 @@ const startQuizSession = async (req, res) => {
 			totalQuestions: quiz.questions.length,
 		});
 		await session.save();
+		quiz.status = 'inprogress';
+		quiz.activeSessionId = session._id;
+		await quiz.save();
 		logger.info(`Quiz session started, sessionId: ${session._id}`);
 		res.json({ message: "Quiz session started", sessionId: session._id, quiz });
 	} catch (error) {
@@ -249,6 +270,8 @@ const completeQuizSession = async (req, res) => {
 		session.isCompleted = true;
 		await session.save();
 		quiz.isCompleted = true;
+		quiz.status = 'completed';
+		quiz.activeSessionId = null;
 		await quiz.save();
 		logger.info(
 			`Quiz session completed successfully, sessionId: ${sessionId}, score: ${score}`
@@ -406,6 +429,37 @@ const getQuizExplanation = async (req, res) => {
 	}
 };
 
+// PATCH /quizzes/:id/session/:sessionId/save-progress
+const saveQuizProgress = async (req, res) => {
+	try {
+		const { answers, timeTaken } = req.body;
+		const { id, sessionId } = req.params;
+		const quiz = await Quiz.findOne({ _id: id, userId: req.userId });
+		if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+
+		const session = await QuizSession.findOne({
+			_id: sessionId,
+			quizId: id,
+			userId: req.userId,
+			isCompleted: false
+		});
+		if (!session) return res.status(404).json({ message: "Session not found" });
+
+		session.answers = answers;
+		session.timeTaken = timeTaken;
+		await session.save();
+
+		quiz.status = 'inprogress';
+		quiz.activeSessionId = sessionId;
+		await quiz.save();
+
+		res.json({ message: "Progress saved" });
+	} catch (error) {
+		logger.error({ message: "Error saving quiz progress", error: error.message });
+		res.status(500).json({ message: "Server error saving progress" });
+	}
+};
+
 module.exports = {
 	generateQuiz,
 	getAllQuizzes,
@@ -417,4 +471,5 @@ module.exports = {
 	getSessionHistory,
 	getQuizResultsBySessionId,
 	getQuizExplanation,
+	saveQuizProgress,
 };
