@@ -7,10 +7,15 @@ const {
 	sendPasswordResetEmail,
 } = require("../services/emailService");
 
-const generateToken = (userId) => {
-	return jwt.sign({ userId }, process.env.JWT_SECRET || "your-secret-key", {
-		expiresIn: "7d",
-	});
+const generateToken = (user) => {
+	console.log(user, "user")
+	return jwt.sign(
+		{ userId: user._id, role: user.role },
+		process.env.JWT_SECRET,
+		{
+			expiresIn: "7d",
+		}
+	);
 };
 
 exports.register = async (req, res) => {
@@ -86,7 +91,7 @@ exports.login = async (req, res) => {
 		user.lastLogin = new Date();
 		await user.save();
 
-		const token = generateToken(user._id);
+		const token = generateToken(user);
 
 		logger.info("User logged in successfully", { userId: user._id, email });
 

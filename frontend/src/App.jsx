@@ -19,6 +19,7 @@ import QuizTakePage from "./components/Quiz/QuizTakePage";
 import QuizResultsPage from "./components/Quiz/QuizResultsPage";
 import QuizExplanationPage from "./components/Quiz/QuizExplanationPage";
 import QuizResultsListPage from "./components/Quiz/QuizResultsListPage";
+import AdminUserReports from "./components/Admin/AdminUserReports";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
@@ -53,6 +54,24 @@ function PublicRoute({ children }) {
 	}
 
 	return !isAuthenticated ? children : <Navigate to="/dashboard" />;
+}
+
+function AdminRoute({ children }) {
+	const { user, loading } = useAuth();
+	if (loading) {
+		return (
+			<div className="d-flex justify-content-center align-items-center min-vh-100">
+				<div className="spinner-border text-primary" role="status">
+					<span className="visually-hidden">Loading...</span>
+				</div>
+			</div>
+		);
+	}
+	return user && user.role === "admin" ? (
+		children
+	) : (
+		<Navigate to="/dashboard" />
+	);
 }
 
 function AppContent() {
@@ -196,6 +215,14 @@ function AppContent() {
 							<ProtectedRoute>
 								<Profile />
 							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/admin/reports"
+						element={
+							<AdminRoute>
+								<AdminUserReports />
+							</AdminRoute>
 						}
 					/>
 				</Routes>

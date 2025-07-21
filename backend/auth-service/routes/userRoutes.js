@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
 const authMiddleware = require("../middlewares/authMiddleware");
+const adminMiddleware = require("../middlewares/adminMiddleware");
 const {
 	updateProfileValidator,
 	changePasswordValidator,
@@ -16,5 +17,7 @@ router.put(
 	changePasswordValidator,
 	userController.changePassword
 );
+router.get("/admin/users", adminMiddleware, userController.getAllUsers);
+router.get("/admin/users/:id", adminMiddleware, userController.getUserById);
 
 module.exports = router;

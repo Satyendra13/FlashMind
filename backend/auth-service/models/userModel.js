@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
 		passwordResetExpires: Date,
 		lastLogin: Date,
 		isActive: { type: Boolean, default: true },
+		role: { type: String, enum: ["user", "admin"], default: "user" },
 	},
 	{ timestamps: true }
 );

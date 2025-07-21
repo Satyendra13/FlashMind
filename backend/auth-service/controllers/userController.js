@@ -77,3 +77,24 @@ exports.changePassword = async (req, res) => {
 		res.status(500).json({ message: "Server error changing password" });
 	}
 };
+
+// Admin: Get all users
+exports.getAllUsers = async (req, res) => {
+	try {
+		const users = await User.find({}, "-passwordHash");
+		res.json(users);
+	} catch (error) {
+		res.status(500).json({ message: "Server error fetching users" });
+	}
+};
+
+// Admin: Get a single user by ID
+exports.getUserById = async (req, res) => {
+	try {
+		const user = await User.findById(req.params.id, "-passwordHash");
+		if (!user) return res.status(404).json({ message: "User not found" });
+		res.json(user);
+	} catch (error) {
+		res.status(500).json({ message: "Server error fetching user" });
+	}
+};
