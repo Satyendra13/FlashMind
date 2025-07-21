@@ -10,6 +10,7 @@ import ResetPassword from "./components/Auth/ResetPassword";
 import EmailVerification from "./components/Auth/EmailVerification";
 import Dashboard from "./components/Dashboard/Dashboard";
 import Notes from "./components/Notes/Notes";
+import NoteView from "./components/Notes/NoteView";
 import Flashcards from "./components/Flashcards/Flashcards";
 import StudyPage from "./components/Flashcards/StudyPage";
 import Quiz from "./components/Quiz/Quiz";
@@ -122,6 +123,14 @@ function AppContent() {
 						element={
 							<ProtectedRoute>
 								<Notes />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/notes/:id"
+						element={
+							<ProtectedRoute>
+								<NoteView />
 							</ProtectedRoute>
 						}
 					/>

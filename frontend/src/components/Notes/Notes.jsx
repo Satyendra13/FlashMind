@@ -32,8 +32,10 @@ import {
 } from "lucide-react";
 import NotesGrid from "./NotesGrid";
 import NotesList from "./NotesList";
+import { useNavigate } from "react-router-dom";
 
 const Notes = () => {
+	const navigate = useNavigate();
 	const [notes, setNotes] = useState([]);
 	const [filteredNotes, setFilteredNotes] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -42,7 +44,6 @@ const Notes = () => {
 	const [viewMode, setViewMode] = useState("grid");
 	const [showUploadModal, setShowUploadModal] = useState(false);
 	const [showCreateModal, setShowCreateModal] = useState(false);
-	const [showViewModal, setShowViewModal] = useState(false);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [selectedNote, setSelectedNote] = useState(null);
 	const [uploading, setUploading] = useState(false);
@@ -169,7 +170,7 @@ const Notes = () => {
 			"text/plain": [".txt"],
 			"image/*": [".jpg", ".jpeg", ".png", ".gif"],
 		},
-		maxSize: 50 * 1024 * 1024,
+		maxSize: 100 * 1024 * 1024,
 	});
 
 	const createNote = async () => {
@@ -240,8 +241,7 @@ const Notes = () => {
 	};
 
 	const viewNote = (note) => {
-		setSelectedNote(note);
-		setShowViewModal(true);
+		navigate(`/notes/${note._id}`);
 	};
 
 	const editNoteHandler = (note) => {
@@ -451,7 +451,7 @@ const Notes = () => {
 						</h5>
 						<p className="text-muted mb-3">or click to select files</p>
 						<p className="small text-muted">
-							Supported formats: PDF, Word, Text, Images (max 10MB each)
+							Supported formats: PDF, Word, Text, Images (max 100MB each)
 						</p>
 					</div>
 					{uploading && (
@@ -671,74 +671,6 @@ const Notes = () => {
 							<Spinner size="sm" animation="border" className="me-2" />
 						) : null}
 						Update Note
-					</Button>
-				</Modal.Footer>
-			</Modal>
-
-			{/* View Note Modal */}
-			<Modal
-				show={showViewModal}
-				onHide={() => setShowViewModal(false)}
-				size="lg"
-			>
-				<Modal.Header closeButton>
-					<Modal.Title>{selectedNote?.title}</Modal.Title>
-				</Modal.Header>
-				<Modal.Body>
-					{selectedNote && (
-						<>
-							<div className="mb-3">
-								<Badge bg="secondary" className="me-2">
-									<div className="d-flex align-items-center">
-										<Folder size={12} className="me-1" />
-										<span>{selectedNote.folder}</span>
-									</div>
-								</Badge>
-								<small className="text-muted">
-									<div className="d-flex align-items-center">
-										<Calendar size={12} className="me-1" />
-										<span>Created: {formatDate(selectedNote.createdAt)}</span>
-									</div>
-								</small>
-							</div>
-							{selectedNote.tags && selectedNote.tags.length > 0 && (
-								<div className="mb-3">
-									{selectedNote.tags.map((tag, index) => (
-										<Badge key={index} bg="light" text="dark" className="me-1">
-											<div className="d-flex align-items-center">
-												<Tag size={10} className="me-1" />
-												<span>{tag}</span>
-											</div>
-										</Badge>
-									))}
-								</div>
-							)}
-							<div
-								className="border rounded p-3"
-								style={{ minHeight: "300px", backgroundColor: "#f8f9fa" }}
-							>
-								<pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-									{selectedNote.content}
-								</pre>
-							</div>
-						</>
-					)}
-				</Modal.Body>
-				<Modal.Footer>
-					<Button
-						variant="outline-primary"
-						onClick={() => {
-							setShowViewModal(false);
-							editNoteHandler(selectedNote);
-						}}
-					>
-						<div className="d-flex justify-content-between align-items-center">
-							<Edit size={16} className="me-2" />
-							<span>Edit</span>
-						</div>
-					</Button>
-					<Button variant="secondary" onClick={() => setShowViewModal(false)}>
-						Close
 					</Button>
 				</Modal.Footer>
 			</Modal>
