@@ -3,11 +3,11 @@ const multer = require("multer");
 const { GridFSBucket } = require("mongodb");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
-const Tesseract = require("tesseract.js");
 const Note = require("../models/note.model");
 const logger = require("../utils/logger");
 const path = require("path");
 const fs = require("fs");
+const aiClient = require("../services/ai.client");
 
 let bucket;
 mongoose.connection.once("open", () => {
@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
 	storage: storage,
-	limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+	limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
 	fileFilter: (req, file, cb) => {
 		console.log(file, "file")
 		const allowedTypes = [
@@ -49,20 +49,28 @@ const upload = multer({
 const extractTextFromFile = async (buffer, mimetype) => {
 	logger.info(`Extracting text from file of type: ${mimetype}`);
 	try {
+		if (mimetype.startsWith("image/") || mimetype === "application/pdf") {
+			logger.info(`Sending image/pdf to AI service for text extraction.`);
+			const base64Image = buffer.toString("base64");
+			const extractedText = await aiClient.generateNoteFromImage(base64Image, mimetype);
+			if (!extractedText) {
+				logger.warn("AI-based text extraction returned empty. Falling back to simple extraction for PDF.");
+				// Fallback for PDF if AI fails
+				if (mimetype === "application/pdf") {
+					const pdfData = await pdfParse(buffer);
+					return pdfData.text;
+				}
+				return ""; // No fallback for images
+			}
+			return extractedText;
+		}
+
 		switch (mimetype) {
-			case "application/pdf":
-				const pdfData = await pdfParse(buffer);
-				return pdfData.text;
 			case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
 				const docxResult = await mammoth.extractRawText({ buffer });
 				return docxResult.value;
 			case "text/plain":
 				return buffer.toString("utf-8");
-			case "image/jpeg":
-			case "image/png":
-			case "image/gif":
-				const ocrResult = await Tesseract.recognize(buffer, "eng");
-				return ocrResult.data.text;
 			default:
 				throw new Error("Unsupported file type for text extraction");
 		}

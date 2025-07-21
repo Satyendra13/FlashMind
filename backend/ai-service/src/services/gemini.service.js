@@ -207,6 +207,33 @@ const _fixAndParseJson = async (text) => {
 	throw new Error("Failed to parse AI response as JSON after multiple attempts.");
 };
 
+const generateTextFromImage = async (prompt, image, mimeType) => {
+	const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+	const imagePart = {
+		inlineData: {
+			data: image,
+			mimeType,
+		},
+	};
+
+	try {
+		logger.info("Calling Gemini AI with image for text generation.");
+		const result = await model.generateContent([prompt, imagePart]);
+		const text = result.response.text();
+
+		if (!text) {
+			throw new Error("Received an empty response from the AI for the image.");
+		}
+
+		return text.trim();
+	} catch (error) {
+		logger.error(`Image to text generation failed: ${error.message}`);
+		throw new Error("Failed to generate text from image using AI service.");
+	}
+};
+
 module.exports = {
 	generateContent,
+	generateTextFromImage,
 };

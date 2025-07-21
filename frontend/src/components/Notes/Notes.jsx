@@ -133,6 +133,9 @@ const Notes = () => {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
+					timeout: 1200000, // 20 minutes in milliseconds
+					maxContentLength: 50 * 1024 * 1024, // 50MB
+					maxBodyLength: 50 * 1024 * 1024, // 50MB
 					onUploadProgress: (progressEvent) => {
 						const progress = Math.round(
 							((i + progressEvent.loaded / progressEvent.total) /
@@ -166,7 +169,7 @@ const Notes = () => {
 			"text/plain": [".txt"],
 			"image/*": [".jpg", ".jpeg", ".png", ".gif"],
 		},
-		maxSize: 10 * 1024 * 1024,
+		maxSize: 50 * 1024 * 1024,
 	});
 
 	const createNote = async () => {

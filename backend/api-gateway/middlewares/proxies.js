@@ -9,7 +9,7 @@ const authProxy = proxy(config.AUTH_SERVICE_URL, {
 const contentProxy = proxy(config.CONTENT_SERVICE_URL, {
 	proxyReqPathResolver: (req) =>
 		req.originalUrl.replace(/^\/api\/content/, "") || "/",
-	limit: '10mb'
+	limit: '100mb'
 });
 
 module.exports = {

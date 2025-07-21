@@ -123,7 +123,7 @@ const generateFlashcards = async (req, res) => {
 	try {
 		const flashcards = await geminiService.generateContent(
 			prompt,
-			options.numberOfQuestions,
+			options.numberOfCards,
 			content
 		);
 		logger.info(`Successfully generated ${flashcards.length} flashcards.`);
@@ -202,8 +202,52 @@ const generateExplanation = async (req, res) => {
 	}
 };
 
+const generateNoteFromImage = async (req, res) => {
+	const { image, mimeType } = req.body;
+
+	if (!image || !mimeType) {
+		return res.status(400).json({ message: "Request must include an image and a mimeType." });
+	}
+
+	logger.info({ message: "Received request to generate note from image" });
+
+	const prompt = `
+		You are an expert multilingual note-taking assistant.
+		Analyze the following image, which contains handwritten text.
+		First, **detect the primary language** of the text in the image.
+		Then, transcribe the text, clean it up, and format it into a clear and organized note **in the detected language**.
+		The output should be a single block of text, ready to be saved as a note.
+		- Correct any spelling mistakes or grammatical errors in the original language.
+		- Structure the content with appropriate headings, lists, and paragraphs.
+		- Do not translate the content. The output must be in the same language as the source image.
+		- Do not add any extra comments or introductory phrases.
+		- Return only the transcribed and formatted text in the detected language.
+	`;
+
+	try {
+		const noteContent = await geminiService.generateTextFromImage(prompt, image, mimeType);
+
+		if (!noteContent) {
+			logger.warn("AI service returned no content for the image.");
+			return res.status(500).json({ message: "The AI service failed to generate the note. The image may not contain clear text." });
+		}
+
+		logger.info("Successfully generated note from image.");
+		res.status(200).json({ noteContent });
+
+	} catch (error) {
+		logger.error({
+			message: "Failed to generate note from image in controller",
+			error: error.message,
+		});
+		res.status(500).json({ message: "A critical error occurred in the AI generation service." });
+	}
+};
+
+
 module.exports = {
 	generateQuiz,
 	generateFlashcards,
 	generateExplanation,
+	generateNoteFromImage,
 };

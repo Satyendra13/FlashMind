@@ -5,6 +5,8 @@ const logger = require("../utils/logger");
 const apiClient = axios.create({
 	baseURL: `${config.aiServiceUrl}/api/ai`,
 	timeout: 1200000,
+	maxContentLength: Infinity,
+	maxBodyLength: Infinity
 });
 
 const generateQuizFromAI = async (content, options) => {
@@ -58,8 +60,25 @@ const generateExplanationFromAI = async (questions, answers) => {
 	}
 };
 
+const generateNoteFromImage = async (image, mimeType) => {
+	try {
+		logger.info("Sending request to AI service to generate note from image.");
+		const response = await apiClient.post("/notes", { image, mimeType });
+		logger.info("Received note content from AI service.");
+		return response.data.noteContent || "";
+	} catch (error) {
+		logger.error({
+			message: "Error calling AI service for note generation from image",
+			error: error.message,
+		});
+		return "";
+	}
+};
+
+
 module.exports = {
 	generateQuizFromAI,
 	generateFlashcardsFromAI,
 	generateExplanationFromAI,
+	generateNoteFromImage,
 };
