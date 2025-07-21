@@ -1,9 +1,16 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ProgressBar, Badge, Button, Modal, Spinner } from "react-bootstrap";
+import {
+	ProgressBar,
+	Badge,
+	Button,
+	Modal,
+	Spinner,
+	Form,
+} from "react-bootstrap";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { Clock, CheckCircle } from "lucide-react";
+import { Clock, CheckCircle, ArrowLeft } from "lucide-react";
 import QuizQuestion from "./QuizQuestion";
 import { Modal as RBModal } from "react-bootstrap";
 
@@ -42,6 +49,30 @@ const QuizTakePage = () => {
 	// Animation state for swipe
 	const [swipeDirection, setSwipeDirection] = useState(null); // 'left' or 'right' or null
 	const [isAnimating, setIsAnimating] = useState(false);
+	const [showAllNav, setShowAllNav] = useState(false); // New state for nav view
+
+	// New useEffect to center the active question
+	useEffect(() => {
+		if (navScrollRef.current && !showAllNav) {
+			const container = navScrollRef.current;
+			// Find the button inside the container
+			const activeButton = container.querySelector(
+				`[data-question-index='${currentQuestionIndex}']`
+			);
+
+			if (activeButton) {
+				const containerWidth = container.offsetWidth;
+				const buttonLeft = activeButton.offsetLeft;
+				const buttonWidth = activeButton.offsetWidth;
+				const scrollTarget = buttonLeft + buttonWidth / 2 - containerWidth / 2;
+
+				container.scrollTo({
+					left: scrollTarget,
+					behavior: "smooth",
+				});
+			}
+		}
+	}, [currentQuestionIndex, showAllNav]);
 
 	// Scroll left/right by a fixed amount
 	const scrollNav = (direction) => {
@@ -96,17 +127,10 @@ const QuizTakePage = () => {
 				if (
 					response.data.sessionId &&
 					response.data.quiz.status === "inprogress" &&
-					response.data.quiz.activeSessionId
+					response.data.quiz.activeSessionId &&
+					response?.data?.existingSession?.answers?.length > 0
 				) {
-					const sessionRes = await axios.get(
-						`/content/quizzes/${quizId}/results/${response.data.sessionId}`,
-						{
-							headers: {
-								Authorization: `Bearer ${localStorage.getItem("token")}`,
-							},
-						}
-					);
-					const session = sessionRes.data;
+					const session = response?.data?.existingSession;
 					const restoredAnswers = (session.answers || []).map((ans) => ({
 						en: "",
 						hi: "",
@@ -125,9 +149,10 @@ const QuizTakePage = () => {
 						new Array(response.data.quiz.questions.length).fill(false)
 					);
 					setTimeLeft(
-						typeof session.timeTaken === "number"
+						session.timeTaken
 							? Math.max(
-									response.data.quiz.timeLimit * 60 - session.timeTaken,
+									response.data.quiz.timeLimit * 60 -
+										parseInt(session.timeTaken),
 									1
 							  )
 							: response.data.quiz.timeLimit * 60
@@ -346,7 +371,6 @@ const QuizTakePage = () => {
 
 		setIsSavingProgress(true);
 		try {
-			// Stop timing current question before saving
 			const currentTimes = [...questionTimes];
 			if (
 				currentTimes[currentQuestionIndex] &&
@@ -388,34 +412,67 @@ const QuizTakePage = () => {
 		}
 	};
 
-	// FIXED: Updated blocking condition to consider quiz completion
+	// Save progress using navigator.sendBeacon for unload
+	const saveProgressBeacon = () => {
+		if (!quizSession?.sessionId) return;
+
+		const currentTimes = [...questionTimes];
+		if (
+			currentTimes[currentQuestionIndex] &&
+			currentTimes[currentQuestionIndex].start != null
+		) {
+			currentTimes[currentQuestionIndex].total += Math.floor(
+				(Date.now() - currentTimes[currentQuestionIndex].start) / 1000
+			);
+		}
+
+		const answersWithTime = userAnswers.map((ans, idx) => ({
+			questionIndex: idx,
+			userAnswerKey: ans.key,
+			timeSpent: currentTimes[idx]?.total || 0,
+		}));
+		const totalTime = currentTimes.reduce((sum, q) => sum + (q?.total || 0), 0);
+
+		const payload = {
+			answers: answersWithTime,
+			timeTaken: totalTime,
+		};
+
+		const url = `/content/quizzes/${quizSession.quiz._id}/session/${quizSession.sessionId}/save-progress`;
+
+		try {
+			const blob = new Blob([JSON.stringify(payload)], {
+				type: "application/json",
+			});
+			navigator.sendBeacon(url, blob);
+		} catch (err) {
+			console.error("Beacon send failed:", err);
+		}
+	};
+
+	// Block navigation when quiz is incomplete
 	const shouldBlock =
 		!submitLoading && !isQuizCompleted && quizSession && quizSession.sessionId;
 
-	// Custom navigation blocking using history
+	// Block browser navigation and handle back button
 	useEffect(() => {
 		if (!shouldBlock) return;
 
-		// Override browser back button
 		const handlePopState = (event) => {
 			event.preventDefault();
-			// Push the current state back to prevent navigation
 			window.history.pushState(null, null, window.location.pathname);
 			setShowLeaveDialog(true);
 			setPendingNavigation("back");
 		};
 
-		// Push an entry to history so we can detect back button
 		window.history.pushState(null, null, window.location.pathname);
 		window.addEventListener("popstate", handlePopState);
 
-		// Block all link clicks and navigation attempts
 		const handleLinkClick = (event) => {
 			const target = event.target.closest(
 				'a, button[onclick], [role="button"]'
 			);
 			if (target && !target.closest(".quiz-take-page")) {
-				// Check if it's a navigation link (has href or onclick that navigates)
 				const href = target.getAttribute("href");
 				const onClick = target.getAttribute("onclick");
 
@@ -433,7 +490,6 @@ const QuizTakePage = () => {
 			}
 		};
 
-		// Add click listener to document to catch all navigation attempts
 		document.addEventListener("click", handleLinkClick, true);
 
 		return () => {
@@ -444,39 +500,24 @@ const QuizTakePage = () => {
 
 	const confirmLeave = async () => {
 		setShowLeaveDialog(false);
-
-		// Temporarily disable blocking to allow navigation
 		setIsQuizCompleted(true);
 
 		try {
 			await saveProgress();
-
-			// Small delay to ensure state updates
 			setTimeout(() => {
-				// Handle the pending navigation
 				if (pendingNavigation === "back") {
-					// UPDATED: Navigate to /quiz instead of going back
 					navigate("/quiz");
-				} else if (
-					pendingNavigation &&
-					typeof pendingNavigation === "function"
-				) {
-					// Execute pending navigation function
+				} else if (typeof pendingNavigation === "function") {
 					pendingNavigation();
 				}
 				setPendingNavigation(null);
 			}, 100);
 		} catch (error) {
 			console.error("Error saving progress before leaving:", error);
-			// Still proceed with navigation even if save fails
 			setTimeout(() => {
 				if (pendingNavigation === "back") {
-					// UPDATED: Navigate to /quiz instead of going back
 					navigate("/quiz");
-				} else if (
-					pendingNavigation &&
-					typeof pendingNavigation === "function"
-				) {
+				} else if (typeof pendingNavigation === "function") {
 					pendingNavigation();
 				}
 				setPendingNavigation(null);
@@ -487,13 +528,11 @@ const QuizTakePage = () => {
 	const cancelLeave = () => {
 		setShowLeaveDialog(false);
 		setPendingNavigation(null);
-		// Re-enable blocking if it was temporarily disabled
 		if (isQuizCompleted && quizSession && quizSession.sessionId) {
 			setIsQuizCompleted(false);
 		}
 	};
 
-	// Custom navigate function that shows confirmation
 	const navigateWithConfirmation = (path) => {
 		if (shouldBlock) {
 			setShowLeaveDialog(true);
@@ -503,37 +542,31 @@ const QuizTakePage = () => {
 		}
 	};
 
-	// FIXED: Enhanced beforeunload handler with custom modal option
+	// beforeunload handler using beacon
 	useEffect(() => {
 		const handleBeforeUnload = (e) => {
 			if (shouldBlock && !isSavingProgress) {
-				// For page refresh/close, show browser's native dialog
+				saveProgressBeacon();
+
 				e.preventDefault();
 				e.returnValue =
 					"Are you sure you want to leave? Your quiz progress will be saved.";
-
-				// Attempt to save progress in background
-				// Note: This might not complete before the page unloads
-				saveProgress().catch(console.error);
-
 				return e.returnValue;
 			}
 		};
 
-		// ALTERNATIVE: If you want to show custom modal for page reload too
-		// (Note: This won't work for closing the tab/browser window)
 		const handleKeyDown = (e) => {
-			// Detect Ctrl+R (Windows) or Cmd+R (Mac) for reload
-			if (shouldBlock && (e.ctrlKey || e.metaKey) && e.key === "r") {
-				e.preventDefault();
-				setShowLeaveDialog(true);
-				setPendingNavigation(() => () => window.location.reload());
-			}
-			// Detect F5 for reload
-			if (shouldBlock && e.key === "F5") {
-				e.preventDefault();
-				setShowLeaveDialog(true);
-				setPendingNavigation(() => () => window.location.reload());
+			if (shouldBlock) {
+				if ((e.ctrlKey || e.metaKey) && e.key === "r") {
+					e.preventDefault();
+					setShowLeaveDialog(true);
+					setPendingNavigation(() => () => window.location.reload());
+				}
+				if (e.key === "F5") {
+					e.preventDefault();
+					setShowLeaveDialog(true);
+					setPendingNavigation(() => () => window.location.reload());
+				}
 			}
 		};
 
@@ -544,13 +577,12 @@ const QuizTakePage = () => {
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 			window.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [shouldBlock, isSavingProgress]);
+	}, [shouldBlock, isSavingProgress, questionTimes, userAnswers]);
 
-	// Handle visibility change (when tab becomes hidden)
+	// Save progress when tab is hidden (e.g. tab switch)
 	useEffect(() => {
 		const handleVisibilityChange = () => {
 			if (document.visibilityState === "hidden" && shouldBlock) {
-				// Save progress when tab becomes hidden
 				saveProgress().catch(console.error);
 			}
 		};
@@ -561,15 +593,15 @@ const QuizTakePage = () => {
 		};
 	}, [shouldBlock]);
 
-	// Auto-save progress periodically
+	// Auto-save every 30 seconds
 	useEffect(() => {
 		if (!shouldBlock) return;
 
-		const autoSaveInterval = setInterval(() => {
+		const interval = setInterval(() => {
 			saveProgress().catch(console.error);
-		}, 30000); // Auto-save every 30 seconds
+		}, 30000);
 
-		return () => clearInterval(autoSaveInterval);
+		return () => clearInterval(interval);
 	}, [shouldBlock, userAnswers, questionTimes]);
 
 	// Swipe handlers for Question Card
@@ -638,68 +670,107 @@ const QuizTakePage = () => {
 
 	return (
 		<div className="container py-4 quiz-take-page">
-			<div className="d-flex align-items-center mb-4">
-				<h2 className="me-3">{quizSession?.quiz?.title}</h2>
-				<Badge bg={timeLeft < 60 ? "danger" : "primary"}>
+			<div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
+				<div className="d-flex align-items-center me-3 mb-2 mb-md-0">
+					<Button
+						variant="secondary"
+						className="me-3"
+						onClick={() => navigateWithConfirmation("/quiz")}
+						aria-label="Back to quizzes"
+					>
+						<ArrowLeft size={20} />
+					</Button>
+					<h2 className="h5 mb-0 text-truncate">{quizSession?.quiz?.title}</h2>
+				</div>
+
+				<div className="d-flex align-items-center">
+					<Badge bg={timeLeft < 60 ? "danger" : "primary"} className="me-3">
+						<div className="d-flex align-items-center px-1 py-1">
+							<Clock size={14} className="me-1" />
+							<span>{formatTime(timeLeft)}</span>
+						</div>
+					</Badge>
 					<div className="d-flex align-items-center">
-						<Clock size={12} className="me-1" />
-						<span>{formatTime(timeLeft)}</span>
+						<Button
+							variant={language === "en" ? "primary" : "outline-primary"}
+							size="sm"
+							onClick={() => setLanguage("en")}
+							className="me-2"
+						>
+							EN
+						</Button>
+						<Button
+							variant={language === "hi" ? "primary" : "outline-primary"}
+							size="sm"
+							onClick={() => setLanguage("hi")}
+						>
+							HI
+						</Button>
 					</div>
-				</Badge>
-				<div className="ms-auto">
-					<Button
-						variant={language === "en" ? "primary" : "outline-primary"}
-						size="sm"
-						onClick={() => setLanguage("en")}
-						className="me-2"
-					>
-						English
-					</Button>
-					<Button
-						variant={language === "hi" ? "primary" : "outline-primary"}
-						size="sm"
-						onClick={() => setLanguage("hi")}
-					>
-						हिन्दी
-					</Button>
 				</div>
 			</div>
 			{/* Question Navigation Panel */}
-			<div className="mb-3">
+			<div className="mb-4 text-center">
+				<div className="d-flex justify-content-end align-items-center mb-2">
+					<Form.Check
+						type="switch"
+						id="toggle-question-nav"
+						label="Show All Questions"
+						checked={showAllNav}
+						onChange={() => setShowAllNav(!showAllNav)}
+					/>
+				</div>
 				<div
-					className="d-flex align-items-center justify-content-center position-relative"
+					className={`d-flex align-items-center position-relative ${
+						showAllNav ? "border rounded p-3 justify-content-center" : ""
+					}`}
 					style={{ minHeight: 56 }}
 				>
-					{/* Left Scroll Button */}
-					<Button
-						variant="light"
-						size="sm"
-						className="me-2 px-2 border"
-						style={{ zIndex: 2, boxShadow: "0 0 6px rgba(0,0,0,0.04)" }}
-						onClick={() => scrollNav(-1)}
-						aria-label="Scroll left"
-					>
-						&lt;
-					</Button>
-					{/* Scrollable Nav */}
+					{/* Left Scroll Button - shown only when NOT in showAll mode */}
+					{!showAllNav && (quizSession?.quiz?.questions?.length || 0) > 8 && (
+						<Button
+							variant="light"
+							size="sm"
+							className="me-2 px-2 border"
+							style={{
+								zIndex: 2,
+								boxShadow: "0 0 6px rgba(0,0,0,0.04)",
+							}}
+							onClick={() => scrollNav(-1)}
+							aria-label="Scroll left"
+						>
+							&lt;
+						</Button>
+					)}
+
+					{/* Scrollable Nav / Grid Nav */}
 					<div
 						ref={navScrollRef}
-						className="flex-nowrap d-flex gap-2 align-items-center"
+						className={`gap-2 align-items-center ${
+							showAllNav
+								? "d-flex flex-wrap justify-content-center"
+								: "flex-nowrap d-flex"
+						}`}
 						style={{
-							overflowX: "auto",
+							overflowX: showAllNav ? "hidden" : "auto",
 							WebkitOverflowScrolling: "touch",
 							scrollbarWidth: "none",
 							msOverflowStyle: "none",
-							maxWidth: "80vw",
-							paddingBottom: 4,
+							paddingBlock: "4px",
+							...(!showAllNav && {
+								flex: "1 1 0",
+								minWidth: 0,
+							}),
 						}}
-						onMouseDown={handleDragStart}
-						onMouseMove={handleDragMove}
-						onMouseUp={handleDragEnd}
-						onMouseLeave={handleDragEnd}
-						onTouchStart={handleDragStart}
-						onTouchMove={handleDragMove}
-						onTouchEnd={handleDragEnd}
+						{...(!showAllNav && {
+							onMouseDown: handleDragStart,
+							onMouseMove: handleDragMove,
+							onMouseUp: handleDragEnd,
+							onMouseLeave: handleDragEnd,
+							onTouchStart: handleDragStart,
+							onTouchMove: handleDragMove,
+							onTouchEnd: handleDragEnd,
+						})}
 					>
 						{quizSession?.quiz?.questions?.map((q, idx) => {
 							const answered = userAnswers[idx]?.key;
@@ -743,28 +814,45 @@ const QuizTakePage = () => {
 											: "Unanswered"
 									}
 									draggable={false}
+									data-question-index={idx} // Add data attribute
 								>
 									{idx + 1}
 									{isMarked && (
-										<span style={{ position: "absolute", top: 2, right: 2 }}>
-											<CheckCircle size={14} className="text-warning" />
+										<span
+											style={{
+												position: "absolute",
+												top: -2,
+												right: -2,
+												lineHeight: 1,
+											}}
+										>
+											<CheckCircle
+												size={14}
+												className="bg-white rounded-circle text-warning"
+											/>
 										</span>
 									)}
 								</Button>
 							);
 						})}
 					</div>
-					{/* Right Scroll Button */}
-					<Button
-						variant="light"
-						size="sm"
-						className="ms-2 px-2 border"
-						style={{ zIndex: 2, boxShadow: "0 0 6px rgba(0,0,0,0.04)" }}
-						onClick={() => scrollNav(1)}
-						aria-label="Scroll right"
-					>
-						&gt;
-					</Button>
+
+					{/* Right Scroll Button - shown only when NOT in showAll mode */}
+					{!showAllNav && (quizSession?.quiz?.questions?.length || 0) > 8 && (
+						<Button
+							variant="light"
+							size="sm"
+							className="ms-2 px-2 border"
+							style={{
+								zIndex: 2,
+								boxShadow: "0 0 6px rgba(0,0,0,0.04)",
+							}}
+							onClick={() => scrollNav(1)}
+							aria-label="Scroll right"
+						>
+							&gt;
+						</Button>
+					)}
 				</div>
 			</div>
 			{/* Question Card */}

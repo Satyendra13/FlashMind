@@ -4,14 +4,14 @@ const logger = require("../utils/logger");
 
 const apiClient = axios.create({
 	baseURL: `${config.aiServiceUrl}/api/ai`,
-	timeout: 60000,
+	timeout: 1200000,
 });
 
 const generateQuizFromAI = async (content, options) => {
 	try {
 		logger.info("Sending request to AI service to generate quiz.");
 		const response = await apiClient.post("/quiz", { content, options }, {
-			timeout: 180000, // Extended to 2 minutes for moderate sizes
+			timeout: 1200000, // Extended to 20 minutes for moderate sizes
 			maxContentLength: Infinity,
 			maxBodyLength: Infinity
 		});

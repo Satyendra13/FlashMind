@@ -170,24 +170,39 @@ const startQuizSession = async (req, res) => {
 			logger.warn(`Quiz not found for starting session, id: ${req.params.id}`);
 			return res.status(404).json({ message: "Quiz not found" });
 		}
-		// Accept sessionId from body or query
-		const sessionId = quiz.activeSessionId || null;
-		if (sessionId) {
+
+		// Try to find an in-progress session ID, prioritizing request body.
+		const sessionIdToResume = req.body.sessionId || quiz.activeSessionId;
+
+		if (sessionIdToResume) {
 			const existingSession = await QuizSession.findOne({
-				_id: sessionId,
+				_id: sessionIdToResume,
 				quizId: quiz._id,
 				userId: req.userId,
-				isCompleted: false
+				isCompleted: false,
 			});
+			console.log("resume session")
 			if (existingSession) {
-				quiz.status = 'inprogress';
-				quiz.activeSessionId = sessionId;
-				await quiz.save();
-				logger.info(`Resuming existing quiz session, sessionId: ${sessionId}`);
-				return res.json({ message: "Quiz session resumed", sessionId, quiz });
+				// If we found a valid session, ensure the quiz document is up-to-date.
+				if (quiz.activeSessionId?.toString() !== existingSession._id.toString()) {
+					quiz.status = "inprogress";
+					quiz.activeSessionId = existingSession._id;
+					await quiz.save();
+				}
+				logger.info(
+					`Resuming existing quiz session, sessionId: ${existingSession._id}`
+				);
+				console.log("start session")
+				return res.json({
+					message: "Quiz session resumed",
+					sessionId: existingSession._id,
+					quiz,
+					existingSession: existingSession
+				});
 			}
 		}
-		// No valid session, create new
+		console.log("new session")
+		// No valid session to resume, create a new one.
 		const session = new QuizSession({
 			userId: req.userId,
 			quizId: quiz._id,
@@ -197,9 +212,11 @@ const startQuizSession = async (req, res) => {
 			totalQuestions: quiz.questions.length,
 		});
 		await session.save();
-		quiz.status = 'inprogress';
+
+		quiz.status = "inprogress";
 		quiz.activeSessionId = session._id;
 		await quiz.save();
+
 		logger.info(`Quiz session started, sessionId: ${session._id}`);
 		res.json({ message: "Quiz session started", sessionId: session._id, quiz });
 	} catch (error) {
