@@ -114,7 +114,6 @@ const Quiz = () => {
 			setDecks(decksRes.data);
 			setQuizHistory(historyRes.data || []);
 		} catch (error) {
-			console.error("Error fetching data:", error);
 			toast.error("Failed to fetch data");
 		} finally {
 			setLoading(false);
@@ -165,7 +164,6 @@ const Quiz = () => {
 				title: "",
 			});
 		} catch (error) {
-			console.error("Generate quiz error:", error);
 			toast.error("Failed to generate quiz");
 		} finally {
 			setGenerateLoading(false);
@@ -181,7 +179,6 @@ const Quiz = () => {
 				state: { sessionId: quiz.activeSessionId || null },
 			});
 		} catch (error) {
-			console.error("Start quiz error:", error);
 			toast.error("Failed to start quiz");
 		} finally {
 			setStartQuizLoading(null);
@@ -231,7 +228,6 @@ const Quiz = () => {
 			setShowResultsModal(true);
 			fetchData();
 		} catch (error) {
-			console.error("Submit quiz error:", error);
 			toast.error("Failed to submit quiz");
 		}
 	};
@@ -249,7 +245,6 @@ const Quiz = () => {
 				toast.success("Quiz deleted successfully!");
 				fetchData();
 			} catch (error) {
-				console.error("Delete quiz error:", error);
 				toast.error("Failed to delete quiz");
 			} finally {
 				setDeleteQuizLoading(null);

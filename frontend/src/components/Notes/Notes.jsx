@@ -89,7 +89,6 @@ const Notes = () => {
 			const uniqueFolders = [...new Set(notesData.map((note) => note.folder))];
 			setFolders(uniqueFolders);
 		} catch (error) {
-			console.error("Error fetching notes:", error);
 			toast.error("Failed to fetch notes");
 		} finally {
 			setLoading(false);
@@ -123,20 +122,18 @@ const Notes = () => {
 		setUploadProgress(0);
 
 		try {
-			console.log(acceptedFiles, "acceptedFiles");
 			for (let i = 0; i < acceptedFiles.length; i++) {
 				const file = acceptedFiles[i];
 				const formData = new FormData();
 				formData.append("file", file);
 				formData.append("folder", "General");
-				console.log(file, "file");
 				await axios.post("/content/notes/upload", formData, {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 					},
 					timeout: 1200000, // 20 minutes in milliseconds
-					maxContentLength: 50 * 1024 * 1024, // 50MB
-					maxBodyLength: 50 * 1024 * 1024, // 50MB
+					maxContentLength: 200 * 1024 * 1024, // 200MB
+					maxBodyLength: 200 * 1024 * 1024, // 200MB
 					onUploadProgress: (progressEvent) => {
 						const progress = Math.round(
 							((i + progressEvent.loaded / progressEvent.total) /
@@ -152,7 +149,6 @@ const Notes = () => {
 			fetchNotes();
 			setShowUploadModal(false);
 		} catch (error) {
-			console.error("Upload error:", error);
 			toast.error("Failed to upload files");
 		} finally {
 			setUploading(false);
@@ -190,7 +186,6 @@ const Notes = () => {
 			setShowCreateModal(false);
 			setNewNote({ title: "", content: "", folder: "General", tags: [] });
 		} catch (error) {
-			console.error("Create note error:", error);
 			toast.error("Failed to create note");
 		} finally {
 			setCreateLoading(false);
@@ -213,7 +208,6 @@ const Notes = () => {
 			fetchNotes();
 			setShowEditModal(false);
 		} catch (error) {
-			console.error("Update note error:", error);
 			toast.error("Failed to update note");
 		} finally {
 			setUpdateLoading(false);
@@ -232,7 +226,6 @@ const Notes = () => {
 				toast.success("Note deleted successfully!");
 				fetchNotes();
 			} catch (error) {
-				console.error("Delete note error:", error);
 				toast.error("Failed to delete note");
 			} finally {
 				setDeleteLoading(null);

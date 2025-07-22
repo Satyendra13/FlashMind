@@ -89,7 +89,6 @@ const Flashcards = () => {
 			setDecks(decksRes.data);
 			setNotes(notesRes.data.notes || []);
 		} catch (error) {
-			console.error("Error fetching data:", error);
 			toast.error("Failed to fetch data");
 		} finally {
 			setLoading(false);
@@ -137,7 +136,6 @@ const Flashcards = () => {
 				customPrompt: "",
 			});
 		} catch (error) {
-			console.error("Generate flashcards error:", error);
 			toast.error("Failed to generate flashcards");
 		} finally {
 			setGenerateLoading(false);
@@ -166,7 +164,6 @@ const Flashcards = () => {
 				tags: [],
 			});
 		} catch (error) {
-			console.error("Create deck error:", error);
 			toast.error("Failed to create deck");
 		} finally {
 			setCreateDeckLoading(false);
@@ -190,7 +187,6 @@ const Flashcards = () => {
 				toast.success("Deck deleted successfully!");
 				fetchData();
 			} catch (error) {
-				console.error("Delete deck error:", error);
 				toast.error("Failed to delete deck");
 			} finally {
 				setDeleteDeckLoading(null);
@@ -239,7 +235,6 @@ const Flashcards = () => {
 			setShowEditCardModal(false);
 			setSelectedCard(null);
 		} catch (error) {
-			console.error("Update card error:", error);
 			toast.error("Failed to update card");
 		} finally {
 			setUpdateCardLoading(false);
@@ -259,7 +254,6 @@ const Flashcards = () => {
 				toast.success("Card deleted successfully!");
 				fetchData();
 			} catch (error) {
-				console.error("Delete card error:", error);
 				toast.error("Failed to delete card");
 			} finally {
 				setDeleteCardLoading(null);

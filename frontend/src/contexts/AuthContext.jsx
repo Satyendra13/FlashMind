@@ -100,7 +100,6 @@ export const AuthProvider = ({ children }) => {
 		try {
 			await axios.post("/auth/logout");
 		} catch (error) {
-			console.error("Logout error:", error);
 		} finally {
 			localStorage.removeItem("token");
 			delete axios.defaults.headers.common["Authorization"];

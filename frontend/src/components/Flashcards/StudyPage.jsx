@@ -111,7 +111,6 @@ const StudyPage = () => {
 				totalCards: flashcardsRes.data.length,
 			}));
 		} catch (error) {
-			console.error("Error fetching deck data:", error);
 			toast.error("Failed to load deck");
 			navigate("/flashcards");
 		} finally {
@@ -151,7 +150,6 @@ const StudyPage = () => {
 				}
 			);
 		} catch (error) {
-			console.error("Error recording review:", error);
 		}
 
 		const newCompletedCards = studySession.completedCards + 1;

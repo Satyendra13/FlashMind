@@ -78,7 +78,6 @@ const Dashboard = () => {
 			setRecentActivity(activityRes.data);
 			setPerformanceData(performanceRes.data);
 		} catch (error) {
-			console.error("Error fetching dashboard data:", error);
 			// Set default data if API fails
 			setStats({
 				totalNotes: 0,

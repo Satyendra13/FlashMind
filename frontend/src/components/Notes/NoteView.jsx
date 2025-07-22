@@ -62,7 +62,6 @@ const NoteView = () => {
 			}
 			setError("");
 		} catch (err) {
-			console.error("Error fetching note:", err);
 			setError(
 				"Failed to fetch note. It might not exist or you may not have permission to view it."
 			);
@@ -84,7 +83,6 @@ const NoteView = () => {
 				toast.success("Note deleted successfully!");
 				navigate("/notes");
 			} catch (error) {
-				console.error("Delete note error:", error);
 				toast.error("Failed to delete note");
 				setDeleteLoading(false);
 			}
@@ -108,7 +106,6 @@ const NoteView = () => {
 			setIsEditing(false);
 			toast.success("Note updated successfully!");
 		} catch (err) {
-			console.error("Update note error:", err);
 			toast.error("Failed to update note.");
 		} finally {
 			setUpdateLoading(false);
@@ -135,7 +132,6 @@ const NoteView = () => {
 			link.remove();
 			toast.success("File download started.");
 		} catch (error) {
-			console.error("Download error:", error);
 			toast.error("Failed to download file.");
 		}
 	};

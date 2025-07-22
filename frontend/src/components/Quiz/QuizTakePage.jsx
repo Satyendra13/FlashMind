@@ -405,7 +405,6 @@ const QuizTakePage = () => {
 			);
 			return true;
 		} catch (error) {
-			console.error("Failed to save progress:", error);
 			return false;
 		} finally {
 			setIsSavingProgress(false);
@@ -446,7 +445,6 @@ const QuizTakePage = () => {
 			});
 			navigator.sendBeacon(url, blob);
 		} catch (err) {
-			console.error("Beacon send failed:", err);
 		}
 	};
 
@@ -513,7 +511,6 @@ const QuizTakePage = () => {
 				setPendingNavigation(null);
 			}, 100);
 		} catch (error) {
-			console.error("Error saving progress before leaving:", error);
 			setTimeout(() => {
 				if (pendingNavigation === "back") {
 					navigate("/quiz");
