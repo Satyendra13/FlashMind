@@ -5,6 +5,7 @@ const config = {
 	geminiApiKey: process.env.GEMINI_API_KEY,
 	frontendUrl: process.env.FRONTEND_URL,
 	openrouterApiKey: process.env.OPENROUTER_API_KEY,
+	aiProvider: process.env.AI_PROVIDER,
 };
 
 module.exports = config;

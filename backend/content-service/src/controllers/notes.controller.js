@@ -55,11 +55,6 @@ const extractTextFromFile = async (buffer, mimetype) => {
 			const extractedText = await aiClient.generateNoteFromImage(base64Image, mimetype);
 			if (!extractedText) {
 				logger.warn("AI-based text extraction returned empty. Falling back to simple extraction for PDF.");
-				// Fallback for PDF if AI fails
-				if (mimetype === "application/pdf") {
-					const pdfData = await pdfParse(buffer);
-					return pdfData.text;
-				}
 				return ""; // No fallback for images
 			}
 			return extractedText;
@@ -108,10 +103,16 @@ const uploadNote = async (req, res) => {
 				fileBuffer,
 				req.file.mimetype
 			);
+			if (!extractedText) {
+				logger.warn("No text extracted from file.");
+				return res.status(500).json({ message: "No text extracted from file." });
+			}
 			const note = new Note({
 				userId: req.userId,
 				title: req.file.originalname.replace(/\.[^/.]+$/, ""),
-				content: extractedText,
+				primaryLanguage: extractedText.primaryLanguage,
+				englishNoteContent: extractedText.englishNoteContent,
+				hindiNoteContent: extractedText.hindiNoteContent,
 				fileId: uploadStream.id,
 				fileName: req.file.originalname,
 				fileType: req.file.mimetype,

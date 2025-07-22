@@ -53,7 +53,7 @@ const generateFlashcards = async (req, res) => {
 				);
 				return res.status(404).json({ message: "Note not found" });
 			}
-			content = note.content;
+			content = note.primaryLanguage && note.primaryLanguage?.toLowerCase() === "english" ? note.englishNoteContent : note.primaryLanguage && note.primaryLanguage?.toLowerCase() === "hindi" ? note.hindiNoteContent : note.content;
 			deckName = `${note.title} - Flashcards`;
 			deckDescription = `AI-generated flashcards from ${note.title}`;
 			deckTags = [note.folder];

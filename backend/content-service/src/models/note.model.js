@@ -8,7 +8,9 @@ const noteSchema = new mongoose.Schema(
 			required: true,
 		},
 		title: { type: String, required: true },
-		content: { type: String, required: true },
+		primaryLanguage: { type: String, required: true },
+		englishNoteContent: { type: String, required: true },
+		hindiNoteContent: { type: String, required: true },
 		fileId: { type: mongoose.Schema.Types.ObjectId, ref: "fs.files" },
 		fileName: String,
 		fileType: String,
@@ -19,7 +21,7 @@ const noteSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-noteSchema.index({ title: "text", content: "text" });
+noteSchema.index({ title: "text", englishNoteContent: "text", hindiNoteContent: "text" });
 
 const Note = mongoose.model("Note", noteSchema);
 

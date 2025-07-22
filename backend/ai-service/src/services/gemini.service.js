@@ -207,6 +207,17 @@ const _fixAndParseJson = async (text) => {
 	throw new Error("Failed to parse AI response as JSON after multiple attempts.");
 };
 
+/**
+ * Processes an image with a given prompt to generate structured note data in multiple languages.
+ * It expects the AI to return a JSON string, which it then parses into an object.
+ * This function also cleans potential markdown fences from the AI's response.
+ *
+ * @param {string} prompt The prompt to send to the AI model.
+ * @param {string} image The base64 encoded image data.
+ * @param {string} mimeType The MIME type of the image (e.g., "image/jpeg", "image/png").
+ * @returns {Promise<{primaryLanguage: string, englishNoteContent: string, hindiNoteContent: string}>} A structured object containing the detected language and the note content in English and Hindi.
+ * @throws {Error} Throws an error if the AI call fails, the response is empty, or the response is not valid JSON.
+ */
 const generateTextFromImage = async (prompt, image, mimeType) => {
 	const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -218,18 +229,35 @@ const generateTextFromImage = async (prompt, image, mimeType) => {
 	};
 
 	try {
-		logger.info("Calling Gemini AI with image for text generation.");
+		logger.info("Calling Gemini AI to analyze image and generate structured note.");
 		const result = await model.generateContent([prompt, imagePart]);
-		const text = result.response.text();
+		let rawResponse = result.response.text();
 
-		if (!text) {
+		if (!rawResponse) {
 			throw new Error("Received an empty response from the AI for the image.");
 		}
 
-		return text.trim();
+        // --- Start of Key Changes ---
+
+		// 1. Clean the response: Remove potential markdown fences and trim whitespace.
+        // This makes the function resilient to the model sometimes adding ```json ... ```
+		const cleanedResponse = rawResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+
+		// 2. Parse the cleaned string into a JSON object.
+		try {
+			const jsonObject = JSON.parse(cleanedResponse);
+			return jsonObject;
+		} catch (jsonError) {
+			logger.error(`Failed to parse JSON response from AI. Error: ${jsonError.message}`);
+			logger.debug(`Raw AI Response was: ${rawResponse}`); // Log the problematic response for debugging
+			throw new Error("AI returned a non-JSON response, parsing failed.");
+		}
+        // --- End of Key Changes ---
+
 	} catch (error) {
-		logger.error(`Image to text generation failed: ${error.message}`);
-		throw new Error("Failed to generate text from image using AI service.");
+        // This catches errors from the AI call itself or the errors thrown above.
+		logger.error(`Image processing failed: ${error.message}`);
+		throw new Error("Failed to process image and generate structured note from AI service.");
 	}
 };
 

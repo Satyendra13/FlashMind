@@ -36,7 +36,7 @@ const generateQuiz = async (req, res) => {
 				logger.warn(`Note not found with id: ${sourceId} for quiz generation.`);
 				return res.status(404).json({ message: "Note not found" });
 			}
-			content = note.content;
+			content = note.primaryLanguage && note.primaryLanguage?.toLowerCase() === "english" ? note.englishNoteContent : note.primaryLanguage && note.primaryLanguage?.toLowerCase() === "hindi" ? note.hindiNoteContent : note.content;
 			title = `Quiz: ${note.title}`;
 		} else if (source === "deck") {
 			if (!sourceId) {

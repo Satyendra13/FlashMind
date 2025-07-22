@@ -27,9 +27,16 @@ const NotesGrid = ({
 							<h6 className="fw-bold mb-0" style={{ fontSize: "1rem" }}>
 								{note.title}
 							</h6>
-							<Badge bg="secondary" className="small">
-								{note.folder}
-							</Badge>
+							<div>
+								{note.primaryLanguage && (
+									<Badge bg="primary" text="white" className="me-1">
+										{note.primaryLanguage.toLowerCase() === "english" ? "EN" : "HI"}
+									</Badge>
+								)}
+								<Badge bg="secondary" className="small">
+									{note.folder}
+								</Badge>
+							</div>
 						</div>
 
 						<p
@@ -41,7 +48,11 @@ const NotesGrid = ({
 								WebkitBoxOrient: "vertical",
 							}}
 						>
-							{note.content}
+							{note.primaryLanguage
+								? note.primaryLanguage.toLowerCase() === "english"
+									? note.englishNoteContent
+									: note.hindiNoteContent
+								: note.content}
 						</p>
 
 						{note.tags && note.tags.length > 0 && (

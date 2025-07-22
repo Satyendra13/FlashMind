@@ -1,8 +1,9 @@
 const geminiService = require("../services/gemini.service");
 const openrouterService = require("../services/openrouter.service");
+const config = require("../config");
 const logger = require("../utils/logger");
 
-const AI_PROVIDER = process.env.AI_PROVIDER || 'gemini';
+const AI_PROVIDER = config.aiProvider || 'gemini';
 const aiService = AI_PROVIDER === 'openrouter' ? openrouterService : geminiService;
 
 const generateQuiz = async (req, res) => {
@@ -216,16 +217,29 @@ const generateNoteFromImage = async (req, res) => {
 	logger.info({ message: "Received request to generate note from image" });
 
 	const prompt = `
-		You are an expert multilingual note-taking assistant.
-		Analyze the following image, which contains handwritten text.
-		First, **detect the primary language** of the text in the image.
-		Then, transcribe the text, clean it up, and format it into a clear and organized note **in the detected language**.
-		The output should be a single block of text, ready to be saved as a note.
-		- Correct any spelling mistakes or grammatical errors in the original language.
-		- Structure the content with appropriate headings, lists, and paragraphs.
-		- Do not translate the content. The output must be in the same language as the source image.
-		- Do not add any extra comments or introductory phrases.
-		- Return only the transcribed and formatted text in the detected language.
+		You are an expert multilingual note-taking and translation assistant.
+
+		Your task is to analyze a handwritten text image and return a structured JSON output based on the following steps:
+
+		1. **Detect the primary language** used in the handwritten text.
+		2. **Remove any page index, page numbers, headers, footers, or other unnecessary text** from the image.
+		3. **Transcribe the text**, correcting spelling and grammatical errors in the original language.
+		4. **Structure the corrected content** into a clear, organized note using appropriate headings, lists, and paragraphs. This will serve as the base note.
+		5. **Translate the base note** into both English and Hindi.
+		6. **Format your response** as a valid JSON object with three specific keys.
+
+		### JSON Output Format:
+		\`\`\`
+			{
+				"primaryLanguage": "The name of the detected language (e.g., 'English', 'Hindi', 'French')",
+				"englishNoteContent": "The full, formatted note translated into English.",
+				"hindiNoteContent": "The full, formatted note translated into Hindi."
+			}
+		\`\`\`
+
+		### Constraints:
+		- Do **not** include any introductory phrases, explanations, or markdown formatting (e.g., \`\`\`json) outside of the JSON object.
+		- The output must be the **raw JSON object only**, without any additional commentary.
 	`;
 
 	try {
