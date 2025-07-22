@@ -1,5 +1,9 @@
 const geminiService = require("../services/gemini.service");
+const openrouterService = require("../services/openrouter.service");
 const logger = require("../utils/logger");
+
+const AI_PROVIDER = process.env.AI_PROVIDER || 'gemini';
+const aiService = AI_PROVIDER === 'openrouter' ? openrouterService : geminiService;
 
 const generateQuiz = async (req, res) => {
 	const { content, options } = req.body;
@@ -68,7 +72,7 @@ const generateQuiz = async (req, res) => {
 		// --- UPDATED SERVICE CALL ---
 		// We now pass the basePrompt, the number of questions, and the raw content
 		// as three separate arguments to our intelligent service.
-		const questions = await geminiService.generateContent(
+		const questions = await aiService.generateContent(
 			basePrompt,
 			options.numberOfQuestions,
 			content
@@ -121,7 +125,7 @@ const generateFlashcards = async (req, res) => {
     Return only the JSON array, no additional text.`;
 
 	try {
-		const flashcards = await geminiService.generateContent(
+		const flashcards = await aiService.generateContent(
 			prompt,
 			options.numberOfCards,
 			content
@@ -179,7 +183,7 @@ const generateExplanation = async (req, res) => {
 
 
 	try {
-		const explanation = await geminiService.generateContent(
+		const explanation = await aiService.generateContent(
 			prompt,
 			options.numberOfQuestions,
 			content
