@@ -323,17 +323,14 @@ const QuizTakePage = () => {
 					timeSpent: questionTimes[idx]?.total || 0,
 				}));
 				// Calculate total time taken
-				const totalTime = questionTimes.reduce(
-					(sum, q) => sum + (q?.total || 0),
-					0
-				);
-				setTotalTimeTaken(totalTime);
+
+				setTotalTimeTaken(quizSession?.quiz?.timeLimit - timeLeft);
 				const response = await axios.post(
 					`/content/quizzes/${quizSession?.quiz?._id}/complete`,
 					{
 						sessionId: quizSession.sessionId,
 						answers: answersWithTime,
-						timeTaken: totalTime,
+						timeTaken: quizSession?.quiz?.timeLimit - timeLeft,
 					},
 					{
 						headers: {
@@ -386,16 +383,12 @@ const QuizTakePage = () => {
 				userAnswerKey: ans.key,
 				timeSpent: currentTimes[idx]?.total || 0,
 			}));
-			const totalTime = currentTimes.reduce(
-				(sum, q) => sum + (q?.total || 0),
-				0
-			);
 
 			await axios.post(
 				`/content/quizzes/${quizSession.quiz._id}/session/${quizSession.sessionId}/save-progress`,
 				{
 					answers: answersWithTime,
-					timeTaken: totalTime,
+					timeTaken: quizSession?.quiz?.timeLimit - timeLeft,
 				},
 				{
 					headers: {
@@ -430,11 +423,10 @@ const QuizTakePage = () => {
 			userAnswerKey: ans.key,
 			timeSpent: currentTimes[idx]?.total || 0,
 		}));
-		const totalTime = currentTimes.reduce((sum, q) => sum + (q?.total || 0), 0);
 
 		const payload = {
 			answers: answersWithTime,
-			timeTaken: totalTime,
+			timeTaken: quizSession?.quiz?.timeLimit - timeLeft,
 		};
 
 		const url = `/content/quizzes/${quizSession.quiz._id}/session/${quizSession.sessionId}/save-progress`;
@@ -444,8 +436,7 @@ const QuizTakePage = () => {
 				type: "application/json",
 			});
 			navigator.sendBeacon(url, blob);
-		} catch (err) {
-		}
+		} catch (err) {}
 	};
 
 	// Block navigation when quiz is incomplete
