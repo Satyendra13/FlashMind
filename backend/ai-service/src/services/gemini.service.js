@@ -174,35 +174,63 @@ ${basePrompt}`;
 
 /**
  * A helper function containing robust JSON parsing and fixing logic.
+ * It can handle trailing commas and extract a JSON object/array from surrounding text.
  * @param {string} text - The raw text response from the AI.
  * @returns {Promise<any>} The parsed JSON object or array.
  */
 const _fixAndParseJson = async (text) => {
-	// This robust parsing logic remains the same.
+	const originalText = text; // Keep a copy for logging
 	if (!text || text.trim() === "") {
 		throw new Error("Cannot parse an empty string.");
 	}
+
+	// Strategy 1: Try to parse the raw text directly
 	try {
 		return JSON.parse(text);
 	} catch (e) {
 		logger.warn("Initial JSON parse failed. Attempting cleanup strategies...");
 	}
-	let fixedText = text.replace(/,\s*([}\]])/g, "$1");
+
+	// Strategy 2: Remove markdown fences and try again
+	let fixedText = text.replace(/```json|```/g, "").trim();
 	try {
 		return JSON.parse(fixedText);
 	} catch (e) {
-		logger.warn("Syntax fix failed.");
+		// This is common, so we don't log a warning here. We proceed to other strategies.
 	}
+
+	// Strategy 3: Fix common syntax errors like trailing commas
+	let syntaxFixedText = fixedText.replace(/,\s*([}\]])/g, "$1");
 	try {
-		const startIndex = fixedText.indexOf('[');
-		if (startIndex !== -1) {
-			const lastBracket = fixedText.lastIndexOf(']');
-			if (lastBracket > startIndex) {
-				return JSON.parse(fixedText.substring(startIndex, lastBracket + 1));
-			}
+		return JSON.parse(syntaxFixedText);
+	} catch (e) {
+		logger.warn("Syntax fix (trailing comma) failed.");
+	}
+
+	// --- START OF THE CRITICAL IMPROVEMENT ---
+
+	// Strategy 4: Extract the first complete JSON object or array from the string
+	try {
+		// Find the first opening brace or bracket
+		const firstOpen = syntaxFixedText.search(/[[{]/);
+		if (firstOpen === -1) {
+			throw new Error("No JSON start token '[' or '{' found.");
+		}
+
+		// Determine the corresponding closing token
+		const matchingClose = syntaxFixedText[firstOpen] === '{' ? '}' : ']';
+
+		// Find the last matching closing token
+		const lastClose = syntaxFixedText.lastIndexOf(matchingClose);
+		if (lastClose > firstOpen) {
+			const jsonCandidate = syntaxFixedText.substring(firstOpen, lastClose + 1);
+			return JSON.parse(jsonCandidate);
+		} else {
+			throw new Error("Could not find a matching closing token for the JSON structure.");
 		}
 	} catch (e) {
-		logger.warn("Truncation fix failed.");
+		logger.warn(`Final extraction logic failed. Error: ${e.message}`);
+		logger.debug(`Original text that failed all parsing attempts: ${originalText}`);
 	}
 	throw new Error("Failed to parse AI response as JSON after multiple attempts.");
 };
@@ -210,13 +238,13 @@ const _fixAndParseJson = async (text) => {
 /**
  * Processes an image with a given prompt to generate structured note data in multiple languages.
  * It expects the AI to return a JSON string, which it then parses into an object.
- * This function also cleans potential markdown fences from the AI's response.
+ * This function is now robust against common AI response formatting issues.
  *
  * @param {string} prompt The prompt to send to the AI model.
  * @param {string} image The base64 encoded image data.
  * @param {string} mimeType The MIME type of the image (e.g., "image/jpeg", "image/png").
  * @returns {Promise<{primaryLanguage: string, englishNoteContent: string, hindiNoteContent: string}>} A structured object containing the detected language and the note content in English and Hindi.
- * @throws {Error} Throws an error if the AI call fails, the response is empty, or the response is not valid JSON.
+ * @throws {Error} Throws an error if the AI call fails or the response cannot be parsed into valid JSON.
  */
 const generateTextFromImage = async (prompt, image, mimeType) => {
 	const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -231,32 +259,30 @@ const generateTextFromImage = async (prompt, image, mimeType) => {
 	try {
 		logger.info("Calling Gemini AI to analyze image and generate structured note.");
 		const result = await model.generateContent([prompt, imagePart]);
-		let rawResponse = result.response.text();
+		const rawResponse = result.response.text();
 
-		if (!rawResponse) {
+		if (!rawResponse || rawResponse.trim() === '') {
+			logger.error("Image processing failed: AI returned an empty response.");
 			throw new Error("Received an empty response from the AI for the image.");
 		}
 
-        // --- Start of Key Changes ---
+		// --- Start of Key Changes ---
 
-		// 1. Clean the response: Remove potential markdown fences and trim whitespace.
-        // This makes the function resilient to the model sometimes adding ```json ... ```
-		const cleanedResponse = rawResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+		// 1. Log the raw response for easier debugging in the future.
+		logger.debug(`Raw AI response for image: ${rawResponse}`);
+		// 2. Use the robust _fixAndParseJson helper function.
+		// This single call replaces the previous manual cleaning and parsing logic.
+		const jsonObject = await _fixAndParseJson(rawResponse);
 
-		// 2. Parse the cleaned string into a JSON object.
-		try {
-			const jsonObject = JSON.parse(cleanedResponse);
-			return jsonObject;
-		} catch (jsonError) {
-			logger.error(`Failed to parse JSON response from AI. Error: ${jsonError.message}`);
-			logger.debug(`Raw AI Response was: ${rawResponse}`); // Log the problematic response for debugging
-			throw new Error("AI returned a non-JSON response, parsing failed.");
-		}
-        // --- End of Key Changes ---
+		logger.info("Successfully parsed structured note from image response.");
+		return jsonObject;
+
+		// --- End of Key Changes ---
 
 	} catch (error) {
-        // This catches errors from the AI call itself or the errors thrown above.
+		// The error will now be either from the AI call itself or a true parsing failure from _fixAndParseJson.
 		logger.error(`Image processing failed: ${error.message}`);
+		// Propagate a user-friendly error message up to the controller.
 		throw new Error("Failed to process image and generate structured note from AI service.");
 	}
 };
