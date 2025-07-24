@@ -141,6 +141,17 @@ const Quiz = () => {
 			const optionsToSend = { ...generateOptions };
 			// Remove language if present
 			delete optionsToSend.language;
+
+			if (
+				generateOptions.source === "note" ||
+				generateOptions.source === "deck"
+			) {
+				optionsToSend.numberOfQuestions = 0;
+				delete optionsToSend.timeLimit;
+			} else if (generateOptions.source === "custom") {
+				// keep as is
+			}
+
 			const response = await axios.post(
 				"/content/quizzes/generate",
 				optionsToSend,
@@ -596,62 +607,66 @@ const Quiz = () => {
 							</Form.Select>
 						</Form.Group>
 
-						<Form.Group className="mb-3">
-							<Form.Label>Number of Questions</Form.Label>
-							<Form.Select
-								value={generateOptions.numberOfQuestions}
-								onChange={(e) =>
-									setGenerateOptions({
-										...generateOptions,
-										numberOfQuestions: parseInt(e.target.value),
-									})
-								}
-							>
-								<option value={5}>5 questions</option>
-								<option value={10}>10 questions</option>
-								<option value={15}>15 questions</option>
-								<option value={20}>20 questions</option>
-								<option value={25}>25 questions</option>
-								<option value={30}>30 questions</option>
-								<option value={40}>40 questions</option>
-								<option value={50}>50 questions</option>
-								<option value={60}>60 questions</option>
-								<option value={70}>70 questions</option>
-								<option value={80}>80 questions</option>
-								<option value={90}>90 questions</option>
-								<option value={100}>100 questions</option>
-								<option value={110}>110 questions</option>
-								<option value={120}>120 questions</option>
-								<option value={130}>130 questions</option>
-								<option value={140}>140 questions</option>
-								<option value={150}>150 questions</option>
-							</Form.Select>
-						</Form.Group>
+						{generateOptions.source === "custom" && (
+							<Form.Group className="mb-3">
+								<Form.Label>Number of Questions</Form.Label>
+								<Form.Select
+									value={generateOptions.numberOfQuestions}
+									onChange={(e) =>
+										setGenerateOptions({
+											...generateOptions,
+											numberOfQuestions: parseInt(e.target.value),
+										})
+									}
+								>
+									<option value={5}>5 questions</option>
+									<option value={10}>10 questions</option>
+									<option value={15}>15 questions</option>
+									<option value={20}>20 questions</option>
+									<option value={25}>25 questions</option>
+									<option value={30}>30 questions</option>
+									<option value={40}>40 questions</option>
+									<option value={50}>50 questions</option>
+									<option value={60}>60 questions</option>
+									<option value={70}>70 questions</option>
+									<option value={80}>80 questions</option>
+									<option value={90}>90 questions</option>
+									<option value={100}>100 questions</option>
+									<option value={110}>110 questions</option>
+									<option value={120}>120 questions</option>
+									<option value={130}>130 questions</option>
+									<option value={140}>140 questions</option>
+									<option value={150}>150 questions</option>
+								</Form.Select>
+							</Form.Group>
+						)}
 
-						<Form.Group className="mb-3">
-							<Form.Label>Time Limit (minutes)</Form.Label>
-							<Form.Select
-								value={generateOptions.timeLimit}
-								onChange={(e) =>
-									setGenerateOptions({
-										...generateOptions,
-										timeLimit: parseInt(e.target.value),
-									})
-								}
-							>
-								<option value={5}>5 minutes</option>
-								<option value={10}>10 minutes</option>
-								<option value={15}>15 minutes</option>
-								<option value={30}>30 minutes</option>
-								<option value={60}>60 minutes</option>
-								<option value={90}>90 minutes</option>
-								<option value={120}>120 minutes</option>
-								<option value={150}>150 minutes</option>
-								<option value={180}>180 minutes</option>
-								<option value={210}>210 minutes</option>
-								<option value={240}>240 minutes</option>
-							</Form.Select>
-						</Form.Group>
+						{generateOptions.source === "custom" && (
+							<Form.Group className="mb-3">
+								<Form.Label>Time Limit (minutes)</Form.Label>
+								<Form.Select
+									value={generateOptions.timeLimit}
+									onChange={(e) =>
+										setGenerateOptions({
+											...generateOptions,
+											timeLimit: parseInt(e.target.value),
+										})
+									}
+								>
+									<option value={5}>5 minutes</option>
+									<option value={10}>10 minutes</option>
+									<option value={15}>15 minutes</option>
+									<option value={30}>30 minutes</option>
+									<option value={60}>60 minutes</option>
+									<option value={90}>90 minutes</option>
+									<option value={120}>120 minutes</option>
+									<option value={150}>150 minutes</option>
+									<option value={180}>180 minutes</option>
+									<option value={210}>210 minutes</option>
+									<option value={240}>240 minutes</option>
+								</Form.Select>
+							</Form.Group>
+						)}
 					</Form>
 				</Modal.Body>
 				<Modal.Footer>

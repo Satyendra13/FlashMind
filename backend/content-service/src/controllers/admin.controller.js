@@ -1,4 +1,3 @@
-const User = require("../../../auth-service/models/userModel");
 const Note = require("../models/note.model");
 const Flashcard = require("../models/flashcard.model");
 const Quiz = require("../models/quiz.model");

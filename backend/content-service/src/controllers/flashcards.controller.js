@@ -15,6 +15,7 @@ const generateFlashcards = async (req, res) => {
 			cardType = "basic",
 			language = "english",
 			customPrompt,
+			totalFlashcard,
 		} = req.body;
 		logger.info(
 			`Generating flashcards for user: ${req.userId}, source: ${source}`
@@ -24,6 +25,8 @@ const generateFlashcards = async (req, res) => {
 		let deckName = "";
 		let deckDescription = "";
 		let deckTags = [];
+		let effectiveNumberOfCards = numberOfCards;
+		let effectiveTotalFlashcard = totalFlashcard;
 
 		if (source === "custom") {
 			if (!customPrompt?.trim() || !title?.trim()) {
@@ -57,6 +60,9 @@ const generateFlashcards = async (req, res) => {
 			deckName = `${note.title} - Flashcards`;
 			deckDescription = `AI-generated flashcards from ${note.title}`;
 			deckTags = [note.folder];
+			// Ignore numberOfCards and totalFlashcard from frontend for note
+			effectiveNumberOfCards = 0;
+			effectiveTotalFlashcard = 0;
 		}
 
 		let deck = await FlashcardDeck.findOne({
@@ -77,11 +83,12 @@ const generateFlashcards = async (req, res) => {
 		}
 
 		const aiFlashcards = await aiClient.generateFlashcardsFromAI(content, {
-			numberOfCards,
+			numberOfCards: effectiveNumberOfCards,
 			difficulty,
 			cardType,
 			language,
 			customPrompt: source === "custom" ? customPrompt : undefined,
+			totalFlashcard: effectiveTotalFlashcard,
 		});
 
 		if (aiFlashcards.length === 0) {

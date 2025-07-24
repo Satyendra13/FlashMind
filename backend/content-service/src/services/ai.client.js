@@ -17,7 +17,6 @@ const generateQuizFromAI = async (content, options) => {
 			maxContentLength: Infinity,
 			maxBodyLength: Infinity
 		});
-		console.log(response.data.questions, "response.data.questions")
 		logger.info("Received quiz data from AI service.");
 		return response.data.questions || [];
 	} catch (error) {

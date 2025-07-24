@@ -112,9 +112,16 @@ const Flashcards = () => {
 				return;
 			}
 			setGenerateLoading(true);
+			const optionsToSend = { ...generateOptions };
+			if (generateOptions.source === "note") {
+				optionsToSend.numberOfCards = 0;
+				// If totalFlashcard is ever sent, set to 0
+				if (optionsToSend.totalFlashcard !== undefined)
+					optionsToSend.totalFlashcard = 0;
+			}
 			const response = await axios.post(
 				"/content/flashcards/generate",
-				generateOptions,
+				optionsToSend,
 				{
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -597,6 +604,26 @@ const Flashcards = () => {
 								<option value="custom">Custom</option>
 							</Form.Select>
 						</Form.Group>
+						{generateOptions.source === "custom" && (
+							<Form.Group className="mb-3">
+								<Form.Label>Number of Cards</Form.Label>
+								<Form.Select
+									value={generateOptions.numberOfCards}
+									onChange={(e) =>
+										setGenerateOptions({
+											...generateOptions,
+											numberOfCards: parseInt(e.target.value),
+										})
+									}
+									disabled={generateLoading}
+								>
+									<option value={5}>5 cards</option>
+									<option value={10}>10 cards</option>
+									<option value={15}>15 cards</option>
+									<option value={20}>20 cards</option>
+								</Form.Select>
+							</Form.Group>
+						)}
 
 						{generateOptions.source === "note" ? (
 							<Form.Group className="mb-3">
@@ -674,25 +701,6 @@ const Flashcards = () => {
 							>
 								<option value="english">English</option>
 								<option value="hindi">Hindi</option>
-							</Form.Select>
-						</Form.Group>
-
-						<Form.Group className="mb-3">
-							<Form.Label>Number of Cards</Form.Label>
-							<Form.Select
-								value={generateOptions.numberOfCards}
-								onChange={(e) =>
-									setGenerateOptions({
-										...generateOptions,
-										numberOfCards: parseInt(e.target.value),
-									})
-								}
-								disabled={generateLoading}
-							>
-								<option value={5}>5 cards</option>
-								<option value={10}>10 cards</option>
-								<option value={15}>15 cards</option>
-								<option value={20}>20 cards</option>
 							</Form.Select>
 						</Form.Group>
 

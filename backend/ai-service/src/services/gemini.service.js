@@ -4,56 +4,108 @@ const logger = require("../utils/logger");
 
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
-// A small number of questions can be generated directly.
 const DIRECT_GENERATION_THRESHOLD = 25;
-const MAX_RETRIES = 2; // Max retries per API call.
+const MAX_RETRIES = 2;
+
+/**
+ * Prepares the content, regardless of format (string or object), into a single string for the AI prompt.
+ * @param {string|{englishNoteContent?: string, hindiNoteContent?: string}} content - The source content.
+ * @returns {string} A single, combined string ready for the prompt.
+ */
+const _prepareContentForPrompt = (content) => {
+	if (!content) {
+		return "";
+	}
+	if (typeof content === 'object' && content !== null) {
+		const parts = [];
+		if (content.englishNoteContent && content.englishNoteContent.trim()) {
+			parts.push(`English Content:\n${content.englishNoteContent.trim()}`);
+		}
+		if (content.hindiNoteContent && content.hindiNoteContent.trim()) {
+			parts.push(`Hindi Content:\n${content.hindiNoteContent.trim()}`);
+		}
+		return parts.join('\n\n---\n\n');
+	}
+	if (typeof content === 'string') {
+		return content.trim();
+	}
+	return "";
+};
+
+/**
+ * Creates the prompt constraint to ensure generation is based on provided content.
+ * @param {string} contentString - A single, prepared string of source content.
+ * @returns {string} The prompt snippet to be added.
+ */
+const _createContentConstraint = (contentString) => {
+	if (contentString && contentString.length > 0) {
+		return `\nAll questions and answers MUST be derived exclusively from the following text. Do not use any external knowledge.\n\nText:\n"""\n${contentString}\n"""`;
+	}
+	return '';
+};
 
 /**
  * Main function to generate questions. Automatically uses the best strategy.
  * @param {string} basePrompt - The prompt containing JSON structure and other rules.
- * @param {number} totalQuestions - The total number of questions requested.
- * @param {string} content - The source content for the quiz.
+ * @param {number | null} totalQuestions - The total number of questions requested. If null/0, will generate max possible.
+ * @param {string|object} content - The source content for the quiz.
  * @returns {Promise<Array>} A promise that resolves to an array of question objects.
  */
 const generateContent = async (basePrompt, totalQuestions, content) => {
-	if (totalQuestions <= DIRECT_GENERATION_THRESHOLD) {
-		// For small amounts, a single direct request is fast and effective.
-		logger.info(`Generating ${totalQuestions} questions via single direct request.`);
-		const fullPrompt = `Generate exactly ${totalQuestions} unique quiz questions. ${basePrompt}`;
-		return await _executeModelRequest(fullPrompt, totalQuestions);
+	const preparedContentString = _prepareContentForPrompt(content);
+	const contentConstraintPrompt = _createContentConstraint(preparedContentString);
+
+	// --- NEW: "Max Generation" Mode ---
+	if (!totalQuestions || totalQuestions <= 0) {
+		logger.info('totalQuestions is not set. Attempting to generate maximum possible questions from content.');
+
+		if (!preparedContentString) {
+			logger.warn('Cannot generate max questions because no content was provided. Returning empty array.');
+			return [];
+		}
+
+		// A special prompt to instruct the AI to be exhaustive.
+		const maxQuestionsPrompt = `Your task is to generate the maximum number of high-quality, unique quiz questions possible from the text provided below. Cover all significant facts, concepts, and details. Do not create trivial questions. ${basePrompt}${contentConstraintPrompt}`;
+		
+		// Use a single, direct request for this task.
+		return await _executeModelRequest(maxQuestionsPrompt, 100); // Expecting a large number
 	} else {
-		// For larger amounts, use the robust topic-based generation to ensure diversity.
-		logger.info(`Question count (${totalQuestions}) is high. Using Topic-Based Generation strategy.`);
-		return await _generateByTopic(basePrompt, totalQuestions, content);
+		// --- Original Logic for a specific number of questions ---
+		if (totalQuestions <= DIRECT_GENERATION_THRESHOLD) {
+			logger.info(`Generating ${totalQuestions} questions via single direct request.`);
+			const fullPrompt = `Generate exactly ${totalQuestions} unique quiz questions. ${basePrompt}${contentConstraintPrompt}`;
+			return await _executeModelRequest(fullPrompt, totalQuestions);
+		} else {
+			if (!preparedContentString) {
+				logger.warn(`Topic-Based Generation requires content to generate ${totalQuestions} questions. Falling back to simple batching.`);
+				return await _generateInBatches_Fallback(basePrompt, totalQuestions, 20, preparedContentString);
+			}
+			logger.info(`Question count (${totalQuestions}) is high. Using Topic-Based Generation strategy.`);
+			return await _generateByTopic(basePrompt, totalQuestions, preparedContentString);
+		}
 	}
 };
 
+
 /**
- * THE GOLD STANDARD METHOD: Generate questions by first identifying topics.
- * This is the best way to prevent repetition in large sets.
+ * Generates questions by first identifying topics from the content string.
  * @param {string} basePrompt - The prompt with JSON rules.
  * @param {number} targetCount - The total number of questions to generate.
- * @param {string} content - The source content.
+ * @param {string} contentString - The prepared source content string.
  * @returns {Promise<Array>}
  */
-const _generateByTopic = async (basePrompt, targetCount, content) => {
+const _generateByTopic = async (basePrompt, targetCount, contentString) => {
 	logger.info("--- Step 1: Extracting distinct topics from content. ---");
 	const allQuestions = [];
+	const contentConstraintPrompt = _createContentConstraint(contentString);
+
 	try {
-		// Dynamically decide how many topics to ask for. Aim for 3-5 questions per topic.
 		const numTopics = Math.ceil(targetCount / 4);
 		const questionsPerTopic = Math.ceil(targetCount / numTopics);
 
-		const topicPrompt = `Based on the following content, identify ${numTopics} distinct topics, themes, or key subject areas that can be used to create quiz questions. Return the topics as a simple JSON array of strings.
+		const topicPrompt = `Based on the following content, identify ${numTopics} distinct topics, themes, or key subject areas that can be used to create quiz questions. Return the topics as a simple JSON array of strings.\n\nExample: ["Topic A", "Topic B", "Topic C"]\n\nContent:\n"""\n${contentString}\n"""`;
 
-Example: ["Topic A", "Topic B", "Topic C"]
-
-Content:
-"""
-${content}
-"""`;
-
-		const topicResponse = await _executeModelRequest(topicPrompt, 1, false); // No JSON fixing needed here
+		const topicResponse = await _executeModelRequest(topicPrompt, 1, false);
 		const topics = Array.isArray(topicResponse) ? topicResponse : JSON.parse(topicResponse);
 
 		if (!topics || topics.length === 0) {
@@ -61,14 +113,12 @@ ${content}
 		}
 		logger.info(`Successfully extracted ${topics.length} topics. Now generating questions for each.`);
 
-		// --- Step 2: Generate questions for each identified topic ---
 		for (let i = 0; i < topics.length; i++) {
 			const topic = topics[i];
 			logger.info(`--- Generating questions for Topic ${i + 1}/${topics.length}: "${topic}" ---`);
 
-			// This prompt is highly specific and focused, reducing repetition.
 			const questionPrompt = `Generate exactly ${questionsPerTopic} unique quiz questions **specifically about the following topic: "${topic}"**.
-${basePrompt}`;
+${basePrompt}${contentConstraintPrompt}`;
 
 			try {
 				const batchQuestions = await _executeModelRequest(questionPrompt, questionsPerTopic);
@@ -77,32 +127,30 @@ ${basePrompt}`;
 			} catch (batchError) {
 				logger.error(`✗ Failed to generate questions for topic "${topic}". Skipping. Error: ${batchError.message}`);
 			}
-			// Delay between topic requests to manage rate limits
 			if (i < topics.length - 1) {
 				await new Promise(resolve => setTimeout(resolve, 1500));
 			}
 		}
 
 		logger.info(`Topic-based generation complete. Total questions: ${allQuestions.length}`);
-		return allQuestions.slice(0, targetCount); // Ensure we don't exceed the target count
+		return allQuestions.slice(0, targetCount);
 
 	} catch (error) {
 		logger.error(`Topic-based generation failed: ${error.message}.`);
 		logger.warn("Falling back to the simple batching method.");
-		// Fallback to the old batching method if topic extraction fails
-		return await _generateInBatches_Fallback(basePrompt, targetCount, 20);
+		return await _generateInBatches_Fallback(basePrompt, targetCount, 20, contentString);
 	}
 };
 
-
 /**
- * Internal function to execute an API call with retries and basic parsing.
+ * Internal function to execute a Gemini API call with retries and parsing.
  * @param {string} prompt - The final prompt to send.
- * @param {number} expectedCount - The number of items we expect back.
+ * @param {number} expectedCount - The number of items we expect back (for logging/context).
  * @param {boolean} [fixJson=true] - Whether to run the advanced JSON repair logic.
  * @returns {Promise<any>}
  */
 const _executeModelRequest = async (prompt, expectedCount, fixJson = true) => {
+	// ... This function remains unchanged ...
 	let lastError = null;
 	for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 		try {
@@ -124,7 +172,7 @@ const _executeModelRequest = async (prompt, expectedCount, fixJson = true) => {
 			const items = Array.isArray(parsedResponse) ? parsedResponse : [parsedResponse];
 
 			if (items.length > 0) {
-				return items; // Success!
+				return items;
 			} else {
 				throw new Error("Parsed response is empty.");
 			}
@@ -138,20 +186,24 @@ const _executeModelRequest = async (prompt, expectedCount, fixJson = true) => {
 			}
 		}
 	}
-	throw lastError; // All retries failed
+	throw lastError;
 };
 
-
 /**
- * FALLBACK METHOD: A simple batching function with a stronger prompt to encourage diversity.
+ * FALLBACK METHOD: A simple batching function with diversity prompts.
+ * @param {string} basePrompt
+ * @param {number} targetCount
+ * @param {number} batchSize
+ * @param {string} contentString - The prepared source content string.
  * @returns {Promise<Array>}
  */
-const _generateInBatches_Fallback = async (basePrompt, targetCount, batchSize) => {
-	// Implementation is similar to the old batching, but with a much stronger prompt.
-	// This is kept as a fallback in case topic generation fails.
+const _generateInBatches_Fallback = async (basePrompt, targetCount, batchSize, contentString) => {
+	// ... This function remains unchanged ...
 	logger.warn("Executing fallback batch generation. Question diversity may be lower.");
 	const totalBatches = Math.ceil(targetCount / batchSize);
 	const allQuestions = [];
+	const contentConstraintPrompt = _createContentConstraint(contentString);
+
 	for (let i = 0; i < totalBatches; i++) {
 		const questionsInBatch = Math.min(batchSize, targetCount - allQuestions.length);
 		if (questionsInBatch <= 0) break;
@@ -160,67 +212,51 @@ const _generateInBatches_Fallback = async (basePrompt, targetCount, batchSize) =
 This is PART ${i + 1} of ${totalBatches}.
 **CRITICAL INSTRUCTION: To avoid repetition, focus on different facts, concepts, or sections of the content than you would for other parts. Do NOT repeat questions that would logically belong in an earlier part.**
 Generate ${questionsInBatch} unique questions based on these rules:
-${basePrompt}`;
+${basePrompt}${contentConstraintPrompt}`;
 		try {
 			const batchQuestions = await _executeModelRequest(batchPrompt, questionsInBatch);
 			allQuestions.push(...batchQuestions);
 		} catch (error) {
-			logger.error(`Fallback Batch ${i + 1} failed and will be skipped.`)
+			logger.error(`Fallback Batch ${i + 1} failed and will be skipped.`);
 		}
 	}
 	return allQuestions;
 };
 
-
 /**
  * A helper function containing robust JSON parsing and fixing logic.
- * It can handle trailing commas and extract a JSON object/array from surrounding text.
  * @param {string} text - The raw text response from the AI.
  * @returns {Promise<any>} The parsed JSON object or array.
  */
 const _fixAndParseJson = async (text) => {
-	const originalText = text; // Keep a copy for logging
+	// ... This function remains unchanged ...
+	const originalText = text;
 	if (!text || text.trim() === "") {
 		throw new Error("Cannot parse an empty string.");
 	}
-
-	// Strategy 1: Try to parse the raw text directly
 	try {
 		return JSON.parse(text);
 	} catch (e) {
 		logger.warn("Initial JSON parse failed. Attempting cleanup strategies...");
 	}
-
-	// Strategy 2: Remove markdown fences and try again
 	let fixedText = text.replace(/```json|```/g, "").trim();
 	try {
 		return JSON.parse(fixedText);
 	} catch (e) {
-		// This is common, so we don't log a warning here. We proceed to other strategies.
+		// Proceed
 	}
-
-	// Strategy 3: Fix common syntax errors like trailing commas
 	let syntaxFixedText = fixedText.replace(/,\s*([}\]])/g, "$1");
 	try {
 		return JSON.parse(syntaxFixedText);
 	} catch (e) {
 		logger.warn("Syntax fix (trailing comma) failed.");
 	}
-
-	// --- START OF THE CRITICAL IMPROVEMENT ---
-
-	// Strategy 4: Extract the first complete JSON object or array from the string
 	try {
-		// Find the first opening brace or bracket
 		const firstOpen = syntaxFixedText.search(/[[{]/);
 		if (firstOpen === -1) {
 			throw new Error("No JSON start token '[' or '{' found.");
 		}
-
-		// Determine the corresponding closing token
 		const matchingClose = syntaxFixedText[firstOpen] === '{' ? '}' : ']';
-
-		// Find the last matching closing token
 		const lastClose = syntaxFixedText.lastIndexOf(matchingClose);
 		if (lastClose > firstOpen) {
 			const jsonCandidate = syntaxFixedText.substring(firstOpen, lastClose + 1);
@@ -236,56 +272,36 @@ const _fixAndParseJson = async (text) => {
 };
 
 /**
- * Processes an image with a given prompt to generate structured note data in multiple languages.
- * It expects the AI to return a JSON string, which it then parses into an object.
- * This function is now robust against common AI response formatting issues.
- *
+ * Processes an image with a given prompt to generate structured note data.
  * @param {string} prompt The prompt to send to the AI model.
  * @param {string} image The base64 encoded image data.
  * @param {string} mimeType The MIME type of the image (e.g., "image/jpeg", "image/png").
- * @returns {Promise<{primaryLanguage: string, englishNoteContent: string, hindiNoteContent: string}>} A structured object containing the detected language and the note content in English and Hindi.
- * @throws {Error} Throws an error if the AI call fails or the response cannot be parsed into valid JSON.
+ * @returns {Promise<object>} A structured object parsed from the AI's JSON response.
  */
 const generateTextFromImage = async (prompt, image, mimeType) => {
+	// ... This function remains unchanged ...
 	const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
 	const imagePart = {
-		inlineData: {
-			data: image,
-			mimeType,
-		},
+		inlineData: { data: image, mimeType },
 	};
-
 	try {
 		logger.info("Calling Gemini AI to analyze image and generate structured note.");
 		const result = await model.generateContent([prompt, imagePart]);
 		const rawResponse = result.response.text();
-
 		if (!rawResponse || rawResponse.trim() === '') {
 			logger.error("Image processing failed: AI returned an empty response.");
 			throw new Error("Received an empty response from the AI for the image.");
 		}
-
-		// --- Start of Key Changes ---
-
-		// 1. Log the raw response for easier debugging in the future.
 		logger.debug(`Raw AI response for image: ${rawResponse}`);
-		// 2. Use the robust _fixAndParseJson helper function.
-		// This single call replaces the previous manual cleaning and parsing logic.
 		const jsonObject = await _fixAndParseJson(rawResponse);
-
 		logger.info("Successfully parsed structured note from image response.");
 		return jsonObject;
-
-		// --- End of Key Changes ---
-
 	} catch (error) {
-		// The error will now be either from the AI call itself or a true parsing failure from _fixAndParseJson.
 		logger.error(`Image processing failed: ${error.message}`);
-		// Propagate a user-friendly error message up to the controller.
 		throw new Error("Failed to process image and generate structured note from AI service.");
 	}
 };
+
 
 module.exports = {
 	generateContent,

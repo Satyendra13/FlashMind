@@ -4,7 +4,11 @@ services:
   api-gateway:
     build:
       context: ./backend/api-gateway
-    env_file: ./backend/api-gateway/.env
+    volumes:
+      - ./backend/api-gateway:/app
+      - /app/node_modules
+    env_file: ./.env
+    command: npm run dev
     ports:
       - "5000:5000"
     networks:
@@ -13,7 +17,11 @@ services:
   auth-service:
     build:
       context: ./backend/auth-service
-    env_file: ./backend/auth-service/.env
+    volumes:
+      - ./backend/auth-service:/app
+      - /app/node_modules
+    env_file: ./.env
+    command: npm run dev
     ports:
       - "5001:5001"
     depends_on:
@@ -24,7 +32,11 @@ services:
   content-service:
     build:
       context: ./backend/content-service
-    env_file: ./backend/content-service/.env
+    volumes:
+      - ./backend/content-service:/app
+      - /app/node_modules
+    env_file: ./.env
+    command: npm run dev
     ports:
       - "5003:5003"
     depends_on:
@@ -36,7 +48,11 @@ services:
   ai-service:
     build:
       context: ./backend/ai-service
-    env_file: ./backend/ai-service/.env
+    volumes:
+      - ./backend/ai-service:/app
+      - /app/node_modules
+    env_file: ./.env
+    command: npm run dev
     ports:
       - "5002:5002"
     depends_on:
@@ -44,13 +60,19 @@ services:
       - content-service
     networks:
       - app-network
+
   frontend:
     build:
       context: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
-      - VITE_API_URL=http://api-gateway:5000/api
+      - VITE_API_URL=http://localhost:5000/api
+    command: npm run dev
+    env_file: ./.env
     ports:
-      - "4173:4173"
+      - "5173:5173"
     depends_on:
       - api-gateway
     networks:

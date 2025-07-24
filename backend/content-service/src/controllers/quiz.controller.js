@@ -22,6 +22,9 @@ const generateQuiz = async (req, res) => {
 
 		let content = "";
 		let title = "";
+		let effectiveNumberOfQuestions = numberOfQuestions;
+		let effectiveTimeLimit = timeLimit;
+
 		if (source === "note") {
 			if (!sourceId) {
 				logger.warn(
@@ -36,8 +39,14 @@ const generateQuiz = async (req, res) => {
 				logger.warn(`Note not found with id: ${sourceId} for quiz generation.`);
 				return res.status(404).json({ message: "Note not found" });
 			}
-			content = note.primaryLanguage && note.primaryLanguage?.toLowerCase() === "english" ? note.englishNoteContent : note.primaryLanguage && note.primaryLanguage?.toLowerCase() === "hindi" ? note.hindiNoteContent : note.content;
+			content = {
+				englishNoteContent: note.englishNoteContent,
+				hindiNoteContent: note.hindiNoteContent,
+			};
 			title = `Quiz: ${note.title}`;
+			// Ignore numberOfQuestions and timeLimit from frontend for note
+			effectiveNumberOfQuestions = 0;
+			effectiveTimeLimit = undefined;
 		} else if (source === "deck") {
 			if (!sourceId) {
 				logger.warn(
@@ -60,6 +69,9 @@ const generateQuiz = async (req, res) => {
 				.map((card) => `Q: ${card.frontContent}\nA: ${card.backContent}`)
 				.join("\n\n");
 			title = `Quiz: ${deck.name}`;
+			// Ignore numberOfQuestions and timeLimit from frontend for deck
+			effectiveNumberOfQuestions = 0;
+			effectiveTimeLimit = undefined;
 		} else if (source === "custom") {
 			if (!customPrompt.trim()) {
 				logger.warn(`Custom prompt is required for custom quiz generation.`);
@@ -71,6 +83,9 @@ const generateQuiz = async (req, res) => {
 			}
 			content = customPrompt;
 			title = req.body.title.trim();
+			// Use frontend values for custom
+			effectiveNumberOfQuestions = numberOfQuestions;
+			effectiveTimeLimit = timeLimit;
 		} else {
 			logger.warn(`Invalid source type: ${source}`);
 			return res.status(400).json({ message: "Invalid source type" });
@@ -84,7 +99,7 @@ const generateQuiz = async (req, res) => {
 		}
 
 		const aiQuestions = await aiClient.generateQuizFromAI(content, {
-			numberOfQuestions,
+			numberOfQuestions: effectiveNumberOfQuestions,
 			quizType,
 			customPrompt,
 			source,
@@ -95,6 +110,14 @@ const generateQuiz = async (req, res) => {
 			throw new Error('AI service returned 0 questions.')
 		}
 
+		// For note or deck, set timeLimit to number of questions * 1.5 (rounded up)
+		let finalTimeLimit;
+		if (source === "note" || source === "deck") {
+			finalTimeLimit = Math.ceil(aiQuestions.length * 1.5);
+		} else {
+			finalTimeLimit = effectiveTimeLimit;
+		}
+
 		const quiz = new Quiz({
 			userId: req.userId,
 			title,
@@ -103,7 +126,7 @@ const generateQuiz = async (req, res) => {
 			quizType,
 			totalQuestions: aiQuestions.length,
 			questions: aiQuestions,
-			timeLimit,
+			timeLimit: finalTimeLimit,
 			customPrompt: source === "custom" ? customPrompt : undefined,
 		});
 		await quiz.save();

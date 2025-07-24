@@ -6,12 +6,35 @@ const MAX_RETRIES = 2;
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL = 'moonshotai/kimi-k2:free';
 
+/**
+ * Creates the prompt constraint to ensure generation is based on provided content.
+ * @param {string} content - The source text for question generation.
+ * @returns {string} The prompt snippet to be added.
+ */
+const _createContentConstraint = (content) => {
+    if (content && content.trim().length > 0) {
+        return `\nAll questions and answers MUST be derived exclusively from the following text. Do not use any external knowledge.\n\nText:\n"""\n${content}\n"""`;
+    }
+    return ''; // Return an empty string if no content is provided.
+};
+
+
 const generateContent = async (basePrompt, totalQuestions, content) => {
+    // Create the content constraint based on whether content is provided.
+    const contentConstraintPrompt = _createContentConstraint(content);
+
+    console.log(contentConstraintPrompt)
     if (totalQuestions <= DIRECT_GENERATION_THRESHOLD) {
         logger.info(`Generating ${totalQuestions} questions via single direct request (OpenRouter).`);
-        const fullPrompt = `Generate exactly ${totalQuestions} unique quiz questions. ${basePrompt}`;
+        // Append the content constraint to the prompt.
+        const fullPrompt = `Generate exactly ${totalQuestions} unique quiz questions. ${basePrompt}. ${contentConstraintPrompt}`;
         return await _executeModelRequest(fullPrompt, totalQuestions);
     } else {
+        // If content is not provided for topic-based generation, it can't work. Fallback immediately.
+        if (!content || content.trim().length === 0) {
+            logger.warn(`Topic-Based Generation requires content. Falling back to simple batching as no content was provided. (OpenRouter)`);
+            return await _generateInBatches_Fallback(basePrompt, totalQuestions, 20, content); // Pass content (which is empty)
+        }
         logger.info(`Question count (${totalQuestions}) is high. Using Topic-Based Generation strategy (OpenRouter).`);
         return await _generateByTopic(basePrompt, totalQuestions, content);
     }
@@ -20,11 +43,15 @@ const generateContent = async (basePrompt, totalQuestions, content) => {
 const _generateByTopic = async (basePrompt, targetCount, content) => {
     logger.info("--- Step 1: Extracting distinct topics from content (OpenRouter). ---");
     const allQuestions = [];
+    // The content constraint will be used when generating questions for each topic.
+    const contentConstraintPrompt = _createContentConstraint(content);
+
     try {
         const numTopics = Math.ceil(targetCount / 4);
         const questionsPerTopic = Math.ceil(targetCount / numTopics);
 
-        const topicPrompt = `Based on the following content, identify ${numTopics} distinct topics, themes, or key subject areas that can be used to create quiz questions. Return the topics as a simple JSON array of strings.\n\nExample: [\"Topic A\", \"Topic B\", \"Topic C\"]\n\nContent:\n\"\"\"\n${content}\n\"\"\"`;
+        // This prompt correctly uses the content to find topics.
+        const topicPrompt = `Based on the following content, identify ${numTopics} distinct topics, themes, or key subject areas that can be used to create quiz questions. Return the topics as a simple JSON array of strings.\n\nExample: ["Topic A", "Topic B", "Topic C"]\n\nContent:\n"""\n${content}\n"""`;
 
         const topicResponse = await _executeModelRequest(topicPrompt, 1, false);
         const topics = Array.isArray(topicResponse) ? topicResponse : JSON.parse(topicResponse);
@@ -36,14 +63,15 @@ const _generateByTopic = async (basePrompt, targetCount, content) => {
 
         for (let i = 0; i < topics.length; i++) {
             const topic = topics[i];
-            logger.info(`--- Generating questions for Topic ${i + 1}/${topics.length}: \"${topic}\" (OpenRouter) ---`);
-            const questionPrompt = `Generate exactly ${questionsPerTopic} unique quiz questions **specifically about the following topic: \"${topic}\"**.\n${basePrompt}`;
+            logger.info(`--- Generating questions for Topic ${i + 1}/${topics.length}: "${topic}" (OpenRouter) ---`);
+            // MODIFIED: Added the contentConstraintPrompt to ensure questions are based on the source text.
+            const questionPrompt = `Generate exactly ${questionsPerTopic} unique quiz questions **specifically about the following topic: "${topic}"**.\n${basePrompt}${contentConstraintPrompt}`;
             try {
                 const batchQuestions = await _executeModelRequest(questionPrompt, questionsPerTopic);
                 allQuestions.push(...batchQuestions);
-                logger.info(`✓ Added ${batchQuestions.length} questions for \"${topic}\". Total: ${allQuestions.length} (OpenRouter)`);
+                logger.info(`✓ Added ${batchQuestions.length} questions for "${topic}". Total: ${allQuestions.length} (OpenRouter)`);
             } catch (batchError) {
-                logger.error(`✗ Failed to generate questions for topic \"${topic}\". Skipping. Error: ${batchError.message} (OpenRouter)`);
+                logger.error(`✗ Failed to generate questions for topic "${topic}". Skipping. Error: ${batchError.message} (OpenRouter)`);
             }
             if (i < topics.length - 1) {
                 await new Promise(resolve => setTimeout(resolve, 1500));
@@ -54,7 +82,8 @@ const _generateByTopic = async (basePrompt, targetCount, content) => {
     } catch (error) {
         logger.error(`Topic-based generation failed: ${error.message} (OpenRouter).`);
         logger.warn("Falling back to the simple batching method (OpenRouter).\n");
-        return await _generateInBatches_Fallback(basePrompt, targetCount, 20);
+        // MODIFIED: Pass content to the fallback function.
+        return await _generateInBatches_Fallback(basePrompt, targetCount, 20, content);
     }
 };
 
@@ -79,7 +108,8 @@ const _executeModelRequest = async (prompt, expectedCount, fixJson = true) => {
                 }),
             });
             if (!response.ok) {
-                throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+                const errorBody = await response.text();
+                throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}. Body: ${errorBody}`);
             }
             const data = await response.json();
             const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
@@ -106,14 +136,19 @@ const _executeModelRequest = async (prompt, expectedCount, fixJson = true) => {
     throw lastError;
 };
 
-const _generateInBatches_Fallback = async (basePrompt, targetCount, batchSize) => {
+const _generateInBatches_Fallback = async (basePrompt, targetCount, batchSize, content) => {
     logger.warn('Executing fallback batch generation. Question diversity may be lower. (OpenRouter)');
     const totalBatches = Math.ceil(targetCount / batchSize);
     const allQuestions = [];
+    const contentConstraintPrompt = _createContentConstraint(content);
+
     for (let i = 0; i < totalBatches; i++) {
         const questionsInBatch = Math.min(batchSize, targetCount - allQuestions.length);
         if (questionsInBatch <= 0) break;
-        const batchPrompt = `You are creating a large, DIVERSE quiz set in parts.\nThis is PART ${i + 1} of ${totalBatches}.\n**CRITICAL INSTRUCTION: To avoid repetition, focus on different facts, concepts, or sections of the content than you would for other parts. Do NOT repeat questions that would logically belong in an earlier part.**\nGenerate ${questionsInBatch} unique questions based on these rules:\n${basePrompt}`;
+
+        // Added the contentConstraintPrompt to the batch prompt.
+        const batchPrompt = `You are creating a large, DIVERSE quiz set in parts.\nThis is PART ${i + 1} of ${totalBatches}.\n**CRITICAL INSTRUCTION: To avoid repetition, focus on different facts, concepts, or sections of the content than you would for other parts. Do NOT repeat questions that would logically belong in an earlier part.**\nGenerate ${questionsInBatch} unique questions based on these rules:\n${basePrompt}${contentConstraintPrompt}`;
+
         try {
             const batchQuestions = await _executeModelRequest(batchPrompt, questionsInBatch);
             allQuestions.push(...batchQuestions);
@@ -133,12 +168,14 @@ const _fixAndParseJson = async (text) => {
     } catch (e) {
         logger.warn('Initial JSON parse failed. Attempting cleanup strategies... (OpenRouter)');
     }
+    // Fix trailing commas in JSON
     let fixedText = text.replace(/,\s*([}\]])/g, '$1');
     try {
         return JSON.parse(fixedText);
     } catch (e) {
         logger.warn('Syntax fix failed. (OpenRouter)');
     }
+    // Attempt to extract JSON from a markdown block or surrounding text
     try {
         const startIndex = fixedText.indexOf('[');
         if (startIndex !== -1) {

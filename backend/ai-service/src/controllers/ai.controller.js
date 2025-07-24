@@ -12,7 +12,7 @@ const generateQuiz = async (req, res) => {
 	if (!content && !(options.customPrompt && options.source === "custom")) {
 		return res.status(400).json({ message: "Request must include content or a custom prompt." });
 	}
-	if (!options || !options.numberOfQuestions || !options.quizType) {
+	if (!options || !options.quizType) {
 		return res.status(400).json({ message: "Request must include options with numberOfQuestions and quizType." });
 	}
 
